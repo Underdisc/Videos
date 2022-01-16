@@ -1,0 +1,17 @@
+{
+  :Version: '0'
+  :Components: {
+    :Model: {
+      :Size: '8'
+    }
+    :Transform: {
+      :Size: '105'
+    }
+    :Sprite: {
+      :Size: '8'
+    }
+    :Text: {
+      :Size: '68'
+    }
+  }
+}
