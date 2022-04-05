@@ -1,1 +1,1 @@
-target_sources($ENV{target} PRIVATE Main.cc)
+target_sources(${targetName} PRIVATE Main.cc)
