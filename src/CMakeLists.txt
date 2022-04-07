@@ -1,1 +1,1 @@
-target_sources(${targetName} PRIVATE Main.cc)
+target_sources(${targetName} PRIVATE EventSequence.cc Main.cc)
