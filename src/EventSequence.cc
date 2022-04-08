@@ -11,6 +11,14 @@ float Ease(float t, EaseType easeType)
     t = 1.0f - t * t;
     break;
   case EaseType::QuadOut: t = t * t; break;
+  case EaseType::QuadOutIn:
+    if (t < 0.5f) {
+      t = 2 * t * t;
+    } else {
+      t = t - 1.0f;
+      t = 1.0f - 2 * t * t;
+    }
+    break;
   case EaseType::Cubic:
     t = t * 2.0f - 1.0f;
     t = t * t * t * 0.5f + 0.5f;

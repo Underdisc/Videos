@@ -16,6 +16,7 @@ enum class EaseType
   Linear,
   QuadIn,
   QuadOut,
+  QuadOutIn,
   Cubic,
   FlattenedCubic,
 };
