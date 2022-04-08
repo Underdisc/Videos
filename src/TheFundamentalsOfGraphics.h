@@ -1,6 +1,9 @@
 #include <comp/Camera.h>
 #include <comp/Model.h>
+#include <comp/Text.h>
 #include <comp/Transform.h>
+#include <gfx/LineModel.h>
+#include <gfx/Model.h>
 #include <math/Constants.h>
 #include <math/Utility.h>
 #include <world/World.h>
@@ -50,19 +53,89 @@ struct Line
   }
 };
 
+struct Bracket
+{
+  Vec3 mCenter;
+  // The extent to the right side of the bracket from the center.
+  Vec3 mExtent;
+  float mFill;
+  AssetId mModelId;
+
+  void VInit(const World::Object& owner)
+  {
+    mCenter = {0.0f, 0.0f, 0.0f};
+    mExtent = {1.0f, 0.0f, 0.0f};
+    mFill = 0.0f;
+    mModelId = AssLib::CreateEmpty<Gfx::Model>("Bracket");
+
+    World::Object leftChild = owner.CreateChild();
+    World::Object rightChild = owner.CreateChild();
+
+    auto& rightModel = rightChild.AddComponent<Comp::Model>();
+    rightModel.mModelId = mModelId;
+    rightModel.mShaderId = AssLib::nColorShaderId;
+    auto& leftModel = leftChild.AddComponent<Comp::Model>();
+    leftModel.mModelId = mModelId;
+    leftModel.mShaderId = AssLib::nColorShaderId;
+
+    auto* leftTransform = leftChild.GetComponent<Comp::Transform>();
+    Math::Quaternion leftRotation;
+    leftRotation.AngleAxis(Math::nPi, {0.0f, 1.0f, 0.0f});
+    leftTransform->SetRotation(leftRotation);
+
+    auto& rightColor = rightChild.AddComponent<Comp::AlphaColor>();
+    rightColor.mAlphaColor = {1.0f, 1.0f, 1.0f, 1.0f};
+    auto& leftColor = leftChild.AddComponent<Comp::AlphaColor>();
+    leftColor.mAlphaColor = {1.0f, 1.0f, 1.0f, 1.0f};
+  }
+
+  void UpdateRepresentation(const World::Object& owner)
+  {
+    Ds::Vector<Vec3> points;
+    points.Push({0.0f, 0.3f, 0.0f});
+    points.Push({0.0f, 0.0f, 0.0f});
+    float extentLength = Math::Magnitude(mExtent);
+    points.Push({extentLength, 0.0f, 0.0f});
+    points.Push({extentLength, -0.4f, 0.0f});
+
+    Gfx::InitLineModel(
+      mModelId,
+      points,
+      mFill,
+      0.25f,
+      Gfx::TerminalType::CollapsedNormal,
+      Gfx::TerminalType::CollapsedNormal);
+
+    auto* transform = owner.GetComponent<Comp::Transform>();
+    Math::Quaternion extentRotation;
+    Vec3 normalExtent = Math::Normalize(mExtent);
+    extentRotation.FromTo({1.0f, 0.0f, 0.0f}, normalExtent);
+    transform->SetRotation(extentRotation);
+    transform->SetTranslation(mCenter);
+  }
+};
+
 struct VertexDescription
 {
   World::SpaceIt mSpaceIt;
   World::MemberId mCameraId;
   World::MemberId mVertexLines[8];
   World::MemberId mVertexSphere;
+  World::MemberId mVertexBracket;
   World::MemberId mVertexLabel;
+
+  AssetId mFontId;
   VertexDescription(EventSequence* eventSequence);
 };
 
 VertexDescription::VertexDescription(EventSequence* seq):
   mSpaceIt(World::CreateTopSpace())
 {
+  mFontId = AssLib::CreateEmpty<Gfx::Font>("FugazOne");
+  AssLib::Asset<Gfx::Font>& font = AssLib::GetAsset<Gfx::Font>(mFontId);
+  font.mPaths.Push("font/fugazOne/font.ttf");
+  font.FullInit();
+
   mCameraId = mSpaceIt->CreateMember();
   Comp::Camera& camera = mSpaceIt->AddComponent<Comp::Camera>(mCameraId);
   camera.mProjectionType = Comp::Camera::ProjectionType::Orthographic;
@@ -110,7 +183,7 @@ VertexDescription::VertexDescription(EventSequence* seq):
       transform.SetUniformScale(t);
     });
   seq->AddEvent(
-    "ShrinkVertexLines", 0.0f, 1.0f, EaseType::QuadIn, [this](float t) {
+    "ShrinkVertexLines", 0.0f, 1.0f, EaseType::QuadOut, [this](float t) {
       float angleIncrement = Math::nPi / 4.0f;
       float angle = 0.0f;
       for (int i = 0; i < 8; ++i) {
@@ -128,18 +201,37 @@ VertexDescription::VertexDescription(EventSequence* seq):
         angle += angleIncrement;
       }
     });
-  seq->AddEvent("DeleteVertexLines", 1.0f, [this](float t) {
+  seq->AddEvent("CreateVertexBracketAndLabel", 1.5f, [this](float t) {
+    mVertexBracket = mSpaceIt->CreateMember();
+    auto& bracket = mSpaceIt->AddComponent<Bracket>(mVertexBracket);
+    bracket.mFill = 0.0f;
+    bracket.mCenter = {0.0f, 1.5f, 0.0f};
+    mVertexLabel = mSpaceIt->CreateMember();
+    auto& text = mSpaceIt->AddComponent<Comp::Text>(mVertexLabel);
+    text.mAlign = Comp::Text::Alignment::Center;
+    text.mFillAmount = 0.0f;
+    text.mText = "Vertex";
+    text.mFontId = mFontId;
+    auto* transform = mSpaceIt->GetComponent<Comp::Transform>(mVertexLabel);
+    transform->SetTranslation({0.0f, 2.0f, 0.0f});
+    transform->SetUniformScale(0.5f);
+  });
+  seq->AddEvent(
+    "ExpandVertexBracket", 0.0f, 0.75f, EaseType::QuadIn, [this](float t) {
+      auto& bracket = *mSpaceIt->GetComponent<Bracket>(mVertexBracket);
+      bracket.mFill = -t;
+      World::Object bracketOwner(&(*mSpaceIt), mVertexBracket);
+      bracket.UpdateRepresentation(bracketOwner);
+    });
+  seq->AddEvent(
+    "ShowVertexLabel", 0.75f, 0.5f, EaseType::QuadIn, [this](float t) {
+      auto* text = mSpaceIt->GetComponent<Comp::Text>(mVertexLabel);
+      text->mFillAmount = t;
+    });
+  seq->AddEvent("DeleteVertexLines", 0.0f, [this](float t) {
     for (int i = 0; i < 8; ++i) {
       mSpaceIt->DeleteMember(mVertexLines[i]);
     }
-  });
-  seq->AddEvent(
-    "ShrinkVertexSphere", 2.0f, 1.0f, EaseType::QuadOut, [this](float t) {
-      auto& transform = *mSpaceIt->GetComponent<Comp::Transform>(mVertexSphere);
-      transform.SetUniformScale(1.0f - t);
-    });
-  seq->AddEvent("DeleteVertexSphere", 1.0f, [this](float t) {
-    mSpaceIt->DeleteMember(mVertexSphere);
   });
 }
 

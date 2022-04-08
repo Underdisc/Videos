@@ -1,6 +1,5 @@
 // Varkor commit hash:
 
-#include <functional>
 #include <iostream>
 #include <math.h>
 
@@ -19,7 +18,6 @@
 #include <ds/Vector.h>
 #include <editor/Editor.h>
 #include <gfx/Font.h>
-#include <gfx/Model.h>
 #include <math/Constants.h>
 #include <math/Utility.h>
 #include <util/Utility.h>
@@ -418,6 +416,7 @@ void RegisterTypes()
   // Registrar::Register<Video::Rotator, Transform>();
   // Registrar::Register<Video::CameraOrbiter, Camera>();
   Registrar::Register<Line, Comp::Model>();
+  Registrar::Register<Bracket, Comp::Transform>();
 }
 
 int main(int argc, char* argv[])
