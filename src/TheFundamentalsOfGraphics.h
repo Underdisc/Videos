@@ -151,6 +151,11 @@ VertexDescription::VertexDescription(EventSequence* seq):
     for (int i = 0; i < 8; ++i) {
       mVertexLines[i] = mSpaceIt->CreateMember();
       mSpaceIt->AddComponent<Line>(mVertexLines[i]);
+      auto* model = mSpaceIt->GetComponent<Comp::Model>(mVertexLines[i]);
+      model->mShaderId = AssLib::nColorShaderId;
+      auto& colorComp =
+        mSpaceIt->AddComponent<Comp::AlphaColor>(mVertexLines[i]);
+      colorComp.mAlphaColor = {1.0f, 1.0f, 1.0f, 1.0f};
     }
   });
   seq->AddEvent(
@@ -202,11 +207,11 @@ VertexDescription::VertexDescription(EventSequence* seq):
       }
     });
   seq->AddEvent("CreateVertexBracketAndLabel", 1.5f, [this](float t) {
-    mVertexBracket = mSpaceIt->CreateMember();
+    mVertexBracket = mSpaceIt->CreateChildMember(mVertexSphere);
     auto& bracket = mSpaceIt->AddComponent<Bracket>(mVertexBracket);
     bracket.mFill = 0.0f;
     bracket.mCenter = {0.0f, 1.5f, 0.0f};
-    mVertexLabel = mSpaceIt->CreateMember();
+    mVertexLabel = mSpaceIt->CreateChildMember(mVertexSphere);
     auto& text = mSpaceIt->AddComponent<Comp::Text>(mVertexLabel);
     text.mAlign = Comp::Text::Alignment::Center;
     text.mFillAmount = 0.0f;
@@ -227,6 +232,12 @@ VertexDescription::VertexDescription(EventSequence* seq):
     "ShowVertexLabel", 0.75f, 0.5f, EaseType::QuadIn, [this](float t) {
       auto* text = mSpaceIt->GetComponent<Comp::Text>(mVertexLabel);
       text->mFillAmount = t;
+    });
+  seq->AddEvent(
+    "MoveVertexSphere", 1.0f, 1.0f, EaseType::QuadOutIn, [this](float t) {
+      auto* transform = mSpaceIt->GetComponent<Comp::Transform>(mVertexSphere);
+      transform->SetTranslation(
+        Interpolate<Vec3>({0.0f, 0.0f, 0.0f}, {-7.0f, 0.0f, 0.0}, t));
     });
   seq->AddEvent("DeleteVertexLines", 0.0f, [this](float t) {
     for (int i = 0; i < 8; ++i) {
