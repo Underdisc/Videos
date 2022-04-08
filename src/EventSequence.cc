@@ -121,7 +121,7 @@ void EventSequence::Update(float dt)
     event.Run(t);
   }
 
-  if (mNextInactiveEvent == mEvents.Size()) {
+  if (mNextInactiveEvent == mEvents.Size() && mActiveEvents.Size() == 0) {
     mStatus = Status::End;
   }
 }
