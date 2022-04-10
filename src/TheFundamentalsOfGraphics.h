@@ -115,6 +115,91 @@ struct Bracket
   }
 };
 
+struct Box
+{
+  Vec3 mCenter;
+  float mWidth;
+  float mHeight;
+  float mFill;
+  AssetId mModelId;
+
+  void VInit(const World::Object& owner)
+  {
+    mCenter = {0.0f, 0.0f, 0.0f};
+    mHeight = 2.0f;
+    mWidth = 4.0f;
+    mModelId = AssLib::CreateEmpty<Gfx::Model>("Box");
+
+    World::Object topChild = owner.CreateChild();
+    World::Object bottomChild = owner.CreateChild();
+
+    auto& topModel = topChild.AddComponent<Comp::Model>();
+    topModel.mModelId = mModelId;
+    auto& bottomModel = bottomChild.AddComponent<Comp::Model>();
+    bottomModel.mModelId = mModelId;
+
+    auto* bottomTransform = bottomChild.GetComponent<Comp::Transform>();
+    Math::Quaternion bottomRotation;
+    bottomRotation.AngleAxis(Math::nPi, {1.0f, 0.0f, 0.0f});
+    bottomTransform->SetRotation(bottomRotation);
+  }
+
+  void UpdateRepresentation(const World::Object& owner)
+  {
+    Ds::Vector<Vec3> points;
+    float halfHeight = mHeight / 2.0f;
+    float halfWidth = mWidth / 2.0f;
+    points.Push({-halfWidth, 0.0f, 0.0f});
+    points.Push({-halfWidth, halfHeight, 0.0f});
+    points.Push({halfWidth, halfHeight, 0.0f});
+    points.Push({halfWidth, 0.0f, 0.0f});
+
+    Gfx::InitLineModel(
+      mModelId,
+      points,
+      mFill,
+      0.2f,
+      Gfx::TerminalType::Flat,
+      Gfx::TerminalType::Flat);
+
+    auto* transform = owner.GetComponent<Comp::Transform>();
+    transform->SetTranslation(mCenter);
+  }
+};
+
+struct Arrow
+{
+  Vec3 mStart;
+  Vec3 mEnd;
+  float mFill;
+
+  void VInit(const World::Object& owner)
+  {
+    auto* model = owner.GetComponent<Comp::Model>();
+    model->mModelId = AssLib::CreateEmpty<Gfx::Model>("Arrow");
+    mStart = {0.0f, 0.0f, 0.0f};
+    mEnd = {0.0f, 0.0f, 0.0f};
+    mFill = 0.0f;
+    UpdateRep(owner);
+  }
+
+  void UpdateRep(const World::Object& owner)
+  {
+    Ds::Vector<Vec3> points;
+    points.Push(mStart);
+    points.Push(mEnd);
+    auto* model = owner.GetComponent<Comp::Model>();
+
+    Gfx::InitLineModel(
+      model->mModelId,
+      points,
+      mFill,
+      0.2f,
+      Gfx::TerminalType::CollapsedBinormal,
+      Gfx::TerminalType::Arrow);
+  }
+};
+
 struct VertexDescription
 {
   World::SpaceIt mSpaceIt;
@@ -123,6 +208,10 @@ struct VertexDescription
   World::MemberId mVertexSphere;
   World::MemberId mVertexBracket;
   World::MemberId mVertexLabel;
+  World::MemberId mAttributeConnectors[3];
+  World::MemberId mAttributeBoxes[3];
+  World::MemberId mAttributeLabel;
+  World::MemberId mAttributeArrows[3];
 
   AssetId mFontId;
   VertexDescription(EventSequence* eventSequence);
@@ -233,12 +322,128 @@ VertexDescription::VertexDescription(EventSequence* seq):
       auto* text = mSpaceIt->GetComponent<Comp::Text>(mVertexLabel);
       text->mFillAmount = t;
     });
+  Vec3 finalVertexSpherePosition = {-7.0f, 0.0f, 0.0f};
   seq->AddEvent(
-    "MoveVertexSphere", 1.0f, 1.0f, EaseType::QuadOutIn, [this](float t) {
+    "MoveVertexSphere",
+    1.0f,
+    1.0f,
+    EaseType::QuadOutIn,
+    [this, finalVertexSpherePosition](float t) {
       auto* transform = mSpaceIt->GetComponent<Comp::Transform>(mVertexSphere);
       transform->SetTranslation(
-        Interpolate<Vec3>({0.0f, 0.0f, 0.0f}, {-7.0f, 0.0f, 0.0}, t));
+        Interpolate<Vec3>({0.0f, 0.0f, 0.0f}, finalVertexSpherePosition, t));
     });
+  Vec3 boxCenters[3];
+  boxCenters[0] = {0.0f, 2.0f, 0.0f};
+  boxCenters[1] = {0.0f, 0.0f, 0.0f};
+  boxCenters[2] = {0.0f, -2.0f, 0.0f};
+  seq->AddEvent(
+    "CreateAttributeElements",
+    1.0f,
+    [this, finalVertexSpherePosition, boxCenters](float t) {
+      for (int i = 0; i < 3; ++i) {
+        mAttributeConnectors[i] = mSpaceIt->CreateMember();
+        auto& line = mSpaceIt->AddComponent<Line>(mAttributeConnectors[i]);
+        line.mStart = finalVertexSpherePosition;
+        line.mEnd = finalVertexSpherePosition;
+        line.mThickness = 0.07f;
+        World::Object lineOwner(&(*mSpaceIt), mAttributeConnectors[i]);
+        line.UpdateTransform(lineOwner);
+        auto* lineModel =
+          mSpaceIt->GetComponent<Comp::Model>(mAttributeConnectors[i]);
+        lineModel->mShaderId = AssLib::nColorShaderId;
+        auto& colorComp =
+          mSpaceIt->AddComponent<Comp::AlphaColor>(mAttributeConnectors[i]);
+        colorComp.mAlphaColor = {1.0f, 1.0f, 1.0f, 1.0f};
+
+        mAttributeBoxes[i] = mSpaceIt->CreateMember();
+        auto& box = mSpaceIt->AddComponent<Box>(mAttributeBoxes[i]);
+        box.mWidth = 5.0f;
+        box.mHeight = 1.25f;
+        box.mFill = 0.0f;
+        box.mCenter = boxCenters[i];
+        World::Object boxOwner(&(*mSpaceIt), mAttributeBoxes[i]);
+        box.UpdateRepresentation(boxOwner);
+      }
+    });
+  for (int i = 0; i < 3; ++i) {
+    seq->AddEvent(
+      "ExpandBoxes", 0.25f, 1.0f, EaseType::QuadOutIn, [this, i](float t) {
+        auto* box = mSpaceIt->GetComponent<Box>(mAttributeBoxes[i]);
+        World::Object boxOwner(&(*mSpaceIt), mAttributeBoxes[i]);
+        box->mFill = t;
+        box->UpdateRepresentation(boxOwner);
+      });
+  }
+  Vec3 connectorEnds[3];
+  connectorEnds[0] = {-2.5f, 2.0f, -0.1f};
+  connectorEnds[1] = {-2.5f, 0.0f, -0.1f};
+  connectorEnds[2] = {-2.5f, -2.0f, -0.1f};
+  for (int i = 0; i < 3; ++i) {
+    seq->AddEvent(
+      "ExpandConnectors",
+      0.25f,
+      1.0f,
+      EaseType::QuadOutIn,
+      [this, finalVertexSpherePosition, connectorEnds, i](float t) {
+        auto* lineComp = mSpaceIt->GetComponent<Line>(mAttributeConnectors[i]);
+        World::Object lineOwner(&(*mSpaceIt), mAttributeConnectors[i]);
+        lineComp->SetEnd(
+          Interpolate<Vec3>(finalVertexSpherePosition, connectorEnds[i], t),
+          lineOwner);
+      });
+  }
+
+  {
+    mAttributeLabel = mSpaceIt->CreateMember();
+    auto& text = mSpaceIt->AddComponent<Comp::Text>(mAttributeLabel);
+    text.mFontId = mFontId;
+    text.mColor = {1.0f, 1.0f, 1.0f};
+    text.mFillAmount = 0.0f;
+    text.mText = "Attributes";
+    text.mAlign = Comp::Text::Alignment::Center;
+    auto* transform = mSpaceIt->GetComponent<Comp::Transform>(mAttributeLabel);
+    transform->SetTranslation({6.5f, -0.3f, 0.0f});
+    transform->SetUniformScale(0.6f);
+  }
+  seq->AddEvent(
+    "ShowAttributeLabel", 1.0f, 1.0f, EaseType::QuadIn, [this](float t) {
+      auto* text = mSpaceIt->GetComponent<Comp::Text>(mAttributeLabel);
+      text->mFillAmount = t;
+    });
+
+  Vec3 arrowStarts[3];
+  Vec3 arrowEnds[3];
+  arrowStarts[0] = {4.3f, 0.5f, 0.0f};
+  arrowStarts[1] = {4.1f, 0.0f, 0.0f};
+  arrowStarts[2] = {4.3f, -0.5f, 0.0f};
+  arrowEnds[0] = {3.2f, 1.5f, 0.0f};
+  arrowEnds[1] = {3.2f, 0.0f, 0.0f};
+  arrowEnds[2] = {3.2f, -1.5f, 0.0f};
+  for (int i = 0; i < 3; ++i) {
+    mAttributeArrows[i] = mSpaceIt->CreateMember();
+    auto& arrow = mSpaceIt->AddComponent<Arrow>(mAttributeArrows[i]);
+    arrow.mFill = 0.0f;
+    arrow.mStart = arrowStarts[i];
+    arrow.mEnd = arrowEnds[i];
+    auto& color = mSpaceIt->AddComponent<Comp::AlphaColor>(mAttributeArrows[i]);
+    color.mAlphaColor = {1.0f, 1.0f, 1.0f, 1.0f};
+    auto* model = mSpaceIt->GetComponent<Comp::Model>(mAttributeArrows[i]);
+    model->mShaderId = AssLib::nColorShaderId;
+
+    seq->AddEvent(
+      "ShowAttributeArrow", 0.25f, 1.0f, EaseType::QuadIn, [this, i](float t) {
+        auto* arrow = mSpaceIt->GetComponent<Arrow>(mAttributeArrows[i]);
+        arrow->mFill = t;
+        World::Object arrowOwner(&(*mSpaceIt), mAttributeArrows[i]);
+        arrow->UpdateRep(arrowOwner);
+      });
+  }
+
+  // I am really starting to think that all elements should be created at the
+  // start of a group. It does not mean you need to create all of the elements
+  // for an entire video, but you do need to create all of the elements for
+  // one part of the video.
   seq->AddEvent("DeleteVertexLines", 0.0f, [this](float t) {
     for (int i = 0; i < 8; ++i) {
       mSpaceIt->DeleteMember(mVertexLines[i]);

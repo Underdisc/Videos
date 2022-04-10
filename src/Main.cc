@@ -417,6 +417,8 @@ void RegisterTypes()
   // Registrar::Register<Video::CameraOrbiter, Camera>();
   Registrar::Register<Line, Comp::Model>();
   Registrar::Register<Bracket, Comp::Transform>();
+  Registrar::Register<Box, Comp::Transform>();
+  Registrar::Register<Arrow, Comp::Model>();
 }
 
 int main(int argc, char* argv[])
