@@ -60,6 +60,8 @@ struct Bracket
   Vec3 mExtent;
   float mFill;
   AssetId mModelId;
+  World::MemberId mLeftChild;
+  World::MemberId mRightChild;
 
   void VInit(const World::Object& owner)
   {
@@ -70,6 +72,8 @@ struct Bracket
 
     World::Object leftChild = owner.CreateChild();
     World::Object rightChild = owner.CreateChild();
+    mLeftChild = leftChild.mMemberId;
+    mRightChild = rightChild.mMemberId;
 
     auto& rightModel = rightChild.AddComponent<Comp::Model>();
     rightModel.mModelId = mModelId;
@@ -87,6 +91,14 @@ struct Bracket
     rightColor.mAlphaColor = {1.0f, 1.0f, 1.0f, 1.0f};
     auto& leftColor = leftChild.AddComponent<Comp::AlphaColor>();
     leftColor.mAlphaColor = {1.0f, 1.0f, 1.0f, 1.0f};
+  }
+
+  void ChangeColor(const World::Object& owner, const Vec4& color)
+  {
+    auto* colorComp = owner.mSpace->GetComponent<Comp::AlphaColor>(mLeftChild);
+    colorComp->mAlphaColor = color;
+    colorComp = owner.mSpace->GetComponent<Comp::AlphaColor>(mRightChild);
+    colorComp->mAlphaColor = color;
   }
 
   void UpdateRepresentation(const World::Object& owner)
@@ -121,44 +133,36 @@ struct Box
   float mWidth;
   float mHeight;
   float mFill;
-  AssetId mModelId;
 
   void VInit(const World::Object& owner)
   {
     mCenter = {0.0f, 0.0f, 0.0f};
     mHeight = 2.0f;
     mWidth = 4.0f;
-    mModelId = AssLib::CreateEmpty<Gfx::Model>("Box");
 
-    World::Object topChild = owner.CreateChild();
-    World::Object bottomChild = owner.CreateChild();
-
-    auto& topModel = topChild.AddComponent<Comp::Model>();
-    topModel.mModelId = mModelId;
-    auto& bottomModel = bottomChild.AddComponent<Comp::Model>();
-    bottomModel.mModelId = mModelId;
-
-    auto* bottomTransform = bottomChild.GetComponent<Comp::Transform>();
-    Math::Quaternion bottomRotation;
-    bottomRotation.AngleAxis(Math::nPi, {1.0f, 0.0f, 0.0f});
-    bottomTransform->SetRotation(bottomRotation);
+    auto* model = owner.GetComponent<Comp::Model>();
+    model->mModelId = AssLib::CreateEmpty<Gfx::Model>("Box");
   }
 
   void UpdateRepresentation(const World::Object& owner)
   {
-    Ds::Vector<Vec3> points;
     float halfHeight = mHeight / 2.0f;
     float halfWidth = mWidth / 2.0f;
-    points.Push({-halfWidth, 0.0f, 0.0f});
-    points.Push({-halfWidth, halfHeight, 0.0f});
-    points.Push({halfWidth, halfHeight, 0.0f});
-    points.Push({halfWidth, 0.0f, 0.0f});
+    float thickness = 0.2f;
 
+    Ds::Vector<Vec3> points;
+    points.Push({-halfWidth - thickness / 2.0f, halfHeight, 0.0f});
+    points.Push({halfWidth, halfHeight, 0.0f});
+    points.Push({halfWidth, -halfHeight, 0.0f});
+    points.Push({-halfWidth, -halfHeight, 0.0f});
+    points.Push({-halfWidth, halfHeight - thickness / 2.0f, 0.0f});
+
+    auto* model = owner.GetComponent<Comp::Model>();
     Gfx::InitLineModel(
-      mModelId,
+      model->mModelId,
       points,
       mFill,
-      0.2f,
+      thickness,
       Gfx::TerminalType::Flat,
       Gfx::TerminalType::Flat);
 
@@ -308,7 +312,9 @@ VertexDescription::VertexDescription(EventSequence* seq):
     text.mFontId = mFontId;
     auto* transform = mSpaceIt->GetComponent<Comp::Transform>(mVertexLabel);
     transform->SetTranslation({0.0f, 2.0f, 0.0f});
-    transform->SetUniformScale(0.5f);
+    transform->SetUniformScale(0.7f);
+    auto& color = mSpaceIt->AddComponent<Comp::AlphaColor>(mVertexLabel);
+    color.mAlphaColor = {1.0f, 1.0f, 1.0f, 1.0f};
   });
   seq->AddEvent(
     "ExpandVertexBracket", 0.0f, 0.75f, EaseType::QuadIn, [this](float t) {
@@ -322,7 +328,7 @@ VertexDescription::VertexDescription(EventSequence* seq):
       auto* text = mSpaceIt->GetComponent<Comp::Text>(mVertexLabel);
       text->mFillAmount = t;
     });
-  Vec3 finalVertexSpherePosition = {-7.0f, 0.0f, 0.0f};
+  Vec3 finalVertexSpherePosition = {-5.5f, 0.0f, 0.0f};
   seq->AddEvent(
     "MoveVertexSphere",
     1.0f,
@@ -333,39 +339,41 @@ VertexDescription::VertexDescription(EventSequence* seq):
       transform->SetTranslation(
         Interpolate<Vec3>({0.0f, 0.0f, 0.0f}, finalVertexSpherePosition, t));
     });
+
+  seq->AddEvent("Blank", 1.0f, [](float t) {});
+
   Vec3 boxCenters[3];
   boxCenters[0] = {0.0f, 2.0f, 0.0f};
   boxCenters[1] = {0.0f, 0.0f, 0.0f};
   boxCenters[2] = {0.0f, -2.0f, 0.0f};
-  seq->AddEvent(
-    "CreateAttributeElements",
-    1.0f,
-    [this, finalVertexSpherePosition, boxCenters](float t) {
-      for (int i = 0; i < 3; ++i) {
-        mAttributeConnectors[i] = mSpaceIt->CreateMember();
-        auto& line = mSpaceIt->AddComponent<Line>(mAttributeConnectors[i]);
-        line.mStart = finalVertexSpherePosition;
-        line.mEnd = finalVertexSpherePosition;
-        line.mThickness = 0.07f;
-        World::Object lineOwner(&(*mSpaceIt), mAttributeConnectors[i]);
-        line.UpdateTransform(lineOwner);
-        auto* lineModel =
-          mSpaceIt->GetComponent<Comp::Model>(mAttributeConnectors[i]);
-        lineModel->mShaderId = AssLib::nColorShaderId;
-        auto& colorComp =
-          mSpaceIt->AddComponent<Comp::AlphaColor>(mAttributeConnectors[i]);
-        colorComp.mAlphaColor = {1.0f, 1.0f, 1.0f, 1.0f};
+  for (int i = 0; i < 3; ++i) {
+    mAttributeConnectors[i] = mSpaceIt->CreateMember();
+    auto& line = mSpaceIt->AddComponent<Line>(mAttributeConnectors[i]);
+    line.mStart = finalVertexSpherePosition;
+    line.mEnd = finalVertexSpherePosition;
+    line.mThickness = 0.07f;
+    World::Object lineOwner(&(*mSpaceIt), mAttributeConnectors[i]);
+    line.UpdateTransform(lineOwner);
+    auto* lineModel =
+      mSpaceIt->GetComponent<Comp::Model>(mAttributeConnectors[i]);
+    lineModel->mShaderId = AssLib::nColorShaderId;
+    auto& colorComp =
+      mSpaceIt->AddComponent<Comp::AlphaColor>(mAttributeConnectors[i]);
+    colorComp.mAlphaColor = {1.0f, 1.0f, 1.0f, 1.0f};
 
-        mAttributeBoxes[i] = mSpaceIt->CreateMember();
-        auto& box = mSpaceIt->AddComponent<Box>(mAttributeBoxes[i]);
-        box.mWidth = 5.0f;
-        box.mHeight = 1.25f;
-        box.mFill = 0.0f;
-        box.mCenter = boxCenters[i];
-        World::Object boxOwner(&(*mSpaceIt), mAttributeBoxes[i]);
-        box.UpdateRepresentation(boxOwner);
-      }
-    });
+    mAttributeBoxes[i] = mSpaceIt->CreateMember();
+    auto& box = mSpaceIt->AddComponent<Box>(mAttributeBoxes[i]);
+    box.mWidth = 5.0f;
+    box.mHeight = 1.25f;
+    box.mFill = 0.0f;
+    box.mCenter = boxCenters[i];
+    World::Object boxOwner(&(*mSpaceIt), mAttributeBoxes[i]);
+    box.UpdateRepresentation(boxOwner);
+    auto& color = mSpaceIt->AddComponent<Comp::AlphaColor>(mAttributeBoxes[i]);
+    color.mAlphaColor = {0.0f, 1.0f, 0.0f, 1.0f};
+    auto* model = mSpaceIt->GetComponent<Comp::Model>(mAttributeBoxes[i]);
+    model->mShaderId = AssLib::nColorShaderId;
+  }
   for (int i = 0; i < 3; ++i) {
     seq->AddEvent(
       "ExpandBoxes", 0.25f, 1.0f, EaseType::QuadOutIn, [this, i](float t) {
@@ -394,29 +402,30 @@ VertexDescription::VertexDescription(EventSequence* seq):
       });
   }
 
+  // Attribute label and arrows.
   {
     mAttributeLabel = mSpaceIt->CreateMember();
     auto& text = mSpaceIt->AddComponent<Comp::Text>(mAttributeLabel);
     text.mFontId = mFontId;
-    text.mColor = {1.0f, 1.0f, 1.0f};
     text.mFillAmount = 0.0f;
     text.mText = "Attributes";
     text.mAlign = Comp::Text::Alignment::Center;
     auto* transform = mSpaceIt->GetComponent<Comp::Transform>(mAttributeLabel);
     transform->SetTranslation({6.5f, -0.3f, 0.0f});
-    transform->SetUniformScale(0.6f);
+    transform->SetUniformScale(0.7f);
+    auto& color = mSpaceIt->AddComponent<Comp::AlphaColor>(mAttributeLabel);
+    color.mAlphaColor = {1.0f, 1.0f, 1.0f, 1.0f};
   }
   seq->AddEvent(
     "ShowAttributeLabel", 1.0f, 1.0f, EaseType::QuadIn, [this](float t) {
       auto* text = mSpaceIt->GetComponent<Comp::Text>(mAttributeLabel);
       text->mFillAmount = t;
     });
-
   Vec3 arrowStarts[3];
   Vec3 arrowEnds[3];
-  arrowStarts[0] = {4.3f, 0.5f, 0.0f};
-  arrowStarts[1] = {4.1f, 0.0f, 0.0f};
-  arrowStarts[2] = {4.3f, -0.5f, 0.0f};
+  arrowStarts[0] = {4.1f, 0.5f, 0.0f};
+  arrowStarts[1] = {3.8f, 0.0f, 0.0f};
+  arrowStarts[2] = {4.1f, -0.5f, 0.0f};
   arrowEnds[0] = {3.2f, 1.5f, 0.0f};
   arrowEnds[1] = {3.2f, 0.0f, 0.0f};
   arrowEnds[2] = {3.2f, -1.5f, 0.0f};
@@ -439,6 +448,156 @@ VertexDescription::VertexDescription(EventSequence* seq):
         arrow->UpdateRep(arrowOwner);
       });
   }
+  // We need some sort of blank event and a wait function. That way we can wait
+  // for all events to be complete and create buffer times where there is
+  // nothing happening.
+  seq->AddEvent("Blank", 0.5f, 0.0f, EaseType::Linear, [](float t) {});
+
+  World::MemberId attributeFlashes[3];
+  for (int i = 0; i < 3; ++i) {
+    attributeFlashes[i] = mSpaceIt->CreateMember();
+    auto& transform =
+      mSpaceIt->AddComponent<Comp::Transform>(attributeFlashes[i]);
+    Vec3 flashCenter = boxCenters[i];
+    flashCenter[2] = -1.0f;
+    transform.SetTranslation(flashCenter);
+    transform.SetScale({4.75f / 2.0f, 1.0f / 2.0f, 0.1f});
+    auto& model = mSpaceIt->AddComponent<Comp::Model>(attributeFlashes[i]);
+    model.mModelId = AssLib::nCubeModelId;
+    model.mShaderId = AssLib::nColorShaderId;
+    auto& color = mSpaceIt->AddComponent<Comp::AlphaColor>(attributeFlashes[i]);
+    color.mAlphaColor = {1.0f, 1.0f, 1.0f, 0.0f};
+    seq->AddEvent(
+      "FlashAttributes",
+      0.25f,
+      1.5f,
+      EaseType::QuadOut,
+      [attributeFlashes, i, this](float t) {
+        t = 1.0f - t;
+        auto* color =
+          mSpaceIt->GetComponent<Comp::AlphaColor>(attributeFlashes[i]);
+        color->mAlphaColor[3] = t;
+      });
+  }
+
+  World::MemberId positionLabel =
+    mSpaceIt->CreateChildMember(mAttributeBoxes[0]);
+  {
+    auto& text = mSpaceIt->AddComponent<Comp::Text>(positionLabel);
+    text.mText = "Position";
+    text.mFontId = mFontId;
+    text.mFillAmount = 0.0f;
+    text.mAlign = Comp::Text::Alignment::Center;
+    auto* transform = mSpaceIt->GetComponent<Comp::Transform>(positionLabel);
+    transform->SetTranslation({0.0f, -0.35f, 0.0f});
+    transform->SetUniformScale(0.7f);
+    auto& color = mSpaceIt->AddComponent<Comp::AlphaColor>(positionLabel);
+    color.mAlphaColor = {1.0f, 1.0f, 1.0f, 1.0f};
+  }
+  seq->AddEvent(
+    "ShowPosition",
+    1.0f,
+    0.5f,
+    EaseType::QuadIn,
+    [this, positionLabel](float t) {
+      auto* text = mSpaceIt->GetComponent<Comp::Text>(positionLabel);
+      text->mFillAmount = t;
+    });
+
+  AssetId heartId = AssLib::CreateEmpty<Gfx::Model>("Heart");
+  AssLib::Asset<Gfx::Model>& heartAsset = AssLib::GetAsset<Gfx::Model>(heartId);
+  heartAsset.mPaths.Push("model/heart.obj");
+  heartAsset.FullInit();
+
+  seq->AddEvent("Blank", 1.0f, 0.0f, EaseType::Linear, [](float t) {});
+  World::MemberId loveAttributes[2];
+  for (int i = 0; i < 2; ++i) {
+    loveAttributes[i] = mSpaceIt->CreateMember();
+    auto& model = mSpaceIt->AddComponent<Comp::Model>(loveAttributes[i]);
+    model.mModelId = heartId;
+    model.mShaderId = AssLib::nColorShaderId;
+    auto& color = mSpaceIt->AddComponent<Comp::AlphaColor>(loveAttributes[i]);
+    color.mAlphaColor = {1.0f, 1.0f, 1.0f, 1.0f};
+    auto* transform =
+      mSpaceIt->GetComponent<Comp::Transform>(loveAttributes[i]);
+    Vec3 translation = boxCenters[i + 1];
+    translation[2] = 1.0f;
+    transform->SetTranslation(translation);
+    transform->SetUniformScale(0.0f);
+    seq->AddEvent(
+      "ExpressLove",
+      0.25f,
+      0.5f,
+      EaseType::QuadIn,
+      [this, loveAttributes, i](float t) {
+        auto* transform =
+          mSpaceIt->GetComponent<Comp::Transform>(loveAttributes[i]);
+        transform->SetUniformScale(t * 0.9f);
+      });
+  }
+
+  // This could be a nicer way to specify the options. Pass this in as a param.
+  // eo = {
+  //  .mName = "HideAllExceptPosition",
+  //  .mTimeUntil = 1.0f,
+  //  .mDuration = 1.0f,
+  //  .mEase = EaseType::QuadIn};
+  seq->AddEvent(
+    "HideAllExceptPosition",
+    1.0f,
+    1.0f,
+    EaseType::QuadIn,
+    [this, loveAttributes](float t) {
+      float newAlpha = 1.0f - t;
+      for (int i = 0; i < 2; ++i) {
+        auto* color =
+          mSpaceIt->GetComponent<Comp::AlphaColor>(mAttributeConnectors[i + 1]);
+        color->mAlphaColor[3] = newAlpha;
+        color =
+          mSpaceIt->GetComponent<Comp::AlphaColor>(mAttributeBoxes[i + 1]);
+        color->mAlphaColor[3] = newAlpha;
+        color = mSpaceIt->GetComponent<Comp::AlphaColor>(loveAttributes[i]);
+        color->mAlphaColor[3] = newAlpha;
+      }
+      for (int i = 0; i < 3; ++i) {
+        auto* color =
+          mSpaceIt->GetComponent<Comp::AlphaColor>(mAttributeArrows[i]);
+        color->mAlphaColor[3] = newAlpha;
+      }
+      auto* color = mSpaceIt->GetComponent<Comp::AlphaColor>(mAttributeLabel);
+      color->mAlphaColor[3] = newAlpha;
+      color = mSpaceIt->GetComponent<Comp::AlphaColor>(mVertexLabel);
+      color->mAlphaColor[3] = newAlpha;
+
+      auto* bracket = mSpaceIt->GetComponent<Bracket>(mVertexBracket);
+      World::Object bracketOwner(&(*mSpaceIt), mVertexBracket);
+      bracket->ChangeColor(bracketOwner, {1.0f, 1.0f, 1.0f, newAlpha});
+    });
+
+  seq->AddEvent(
+    "MoveVertexAndPosition",
+    1.0f,
+    1.0f,
+    EaseType::QuadOutIn,
+    [this, finalVertexSpherePosition, boxCenters](float t) {
+      auto* transform = mSpaceIt->GetComponent<Comp::Transform>(mVertexSphere);
+      Vec3 sphereTranslation =
+        Interpolate<Vec3>(finalVertexSpherePosition, {-5.5f, 3.5f, 0.0f}, t);
+      transform->SetTranslation(sphereTranslation);
+
+      transform = mSpaceIt->GetComponent<Comp::Transform>(mAttributeBoxes[0]);
+      Vec3 boxTranslation =
+        Interpolate<Vec3>(boxCenters[0], {0.0f, 3.5f, 0.0f}, t);
+      transform->SetTranslation(boxTranslation);
+
+      World::Object lineOwner(&(*mSpaceIt), mAttributeConnectors[0]);
+      auto* line = lineOwner.GetComponent<Line>();
+      line->mStart = sphereTranslation;
+      line->mEnd = boxTranslation;
+      line->mEnd[0] -= 2.5f;
+      line->mEnd[2] = -0.1f;
+      line->UpdateTransform(lineOwner);
+    });
 
   // I am really starting to think that all elements should be created at the
   // start of a group. It does not mean you need to create all of the elements
