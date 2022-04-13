@@ -32,6 +32,13 @@ struct EventSequence
     Pause
   };
 
+  struct Options
+  {
+    std::string mName;
+    float mDuration;
+    EaseType mEase;
+  };
+
   struct Event
   {
     std::string mName;
@@ -49,17 +56,11 @@ struct EventSequence
     float mTimeAfter;
   };
 
+  void Add(const Options& options, std::function<void(float t)> function);
+  void Gap(float duration);
+  void Wait();
+
   EventSequence();
-  void AddEvent(
-    const std::string& name,
-    float timeUntil,
-    std::function<void(float t)> function);
-  void AddEvent(
-    const std::string& name,
-    float timeUntil,
-    float duration,
-    EaseType ease,
-    std::function<void(float t)> function);
 
   void Continue();
   void Pause();

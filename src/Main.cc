@@ -402,13 +402,13 @@ Introduction nIntroduction;
 
 */
 
-TheFundamentalsOfGraphics* theFundamentalsOfGraphics;
+EventSequence gEventSequence;
 void CentralUpdate()
 {
   if (Input::KeyPressed(Input::Key::Space)) {
-    theFundamentalsOfGraphics->Continue();
+    gEventSequence.Continue();
   }
-  theFundamentalsOfGraphics->Update(Temporal::DeltaTime());
+  gEventSequence.Update(Temporal::DeltaTime());
 }
 
 void RegisterTypes()
@@ -429,10 +429,9 @@ int main(int argc, char* argv[])
     return 0;
   }
 
-  theFundamentalsOfGraphics = new TheFundamentalsOfGraphics;
+  TheFundamentalsOfGraphics(&gEventSequence);
   World::nCentralUpdate = CentralUpdate;
   VarkorRun();
-  delete theFundamentalsOfGraphics;
 
   VarkorPurge();
 }
