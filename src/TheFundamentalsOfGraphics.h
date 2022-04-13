@@ -236,7 +236,7 @@ void VertexDescription(EventSequence* sequence)
   eo.mName = "ExpandVertexLines";
   eo.mDuration = 1.0f;
   eo.mEase = EaseType::QuadIn;
-  seq.Add(eo, [spaceIt, vertexLines](float t) {
+  seq.Add(eo, [=](float t) {
     float angleIncrement = Math::nPi / 4.0f;
     float angle = 0.0f;
     for (int i = 0; i < 8; ++i) {
@@ -259,7 +259,7 @@ void VertexDescription(EventSequence* sequence)
   eo.mName = "ShrinkVertexLines";
   eo.mDuration = 1.0f;
   eo.mEase = EaseType::QuadOut;
-  seq.Add(eo, [spaceIt, vertexLines](float t) {
+  seq.Add(eo, [=](float t) {
     float angleIncrement = Math::nPi / 4.0f;
     float angle = 0.0f;
     for (int i = 0; i < 8; ++i) {
@@ -288,7 +288,7 @@ void VertexDescription(EventSequence* sequence)
   eo.mName = "ExpandVertexSphere";
   eo.mDuration = 1.0f;
   eo.mEase = EaseType::QuadIn;
-  seq.Add(eo, [spaceIt, vertexSphere](float t) {
+  seq.Add(eo, [=](float t) {
     auto& transform = *spaceIt->GetComponent<Comp::Transform>(vertexSphere);
     transform.SetUniformScale(t);
   });
@@ -306,7 +306,7 @@ void VertexDescription(EventSequence* sequence)
   eo.mName = "ExpandVertexBracket";
   eo.mDuration = 0.75;
   eo.mEase = EaseType::QuadIn;
-  seq.Add(eo, [spaceIt, vertexBracket](float t) {
+  seq.Add(eo, [=](float t) {
     auto& bracket = *spaceIt->GetComponent<Bracket>(vertexBracket);
     bracket.mFill = -t;
     World::Object bracketOwner(&(*spaceIt), vertexBracket);
@@ -334,7 +334,7 @@ void VertexDescription(EventSequence* sequence)
   eo.mName = "ShowVertexLabel";
   eo.mDuration = 0.5f;
   eo.mEase = EaseType::QuadIn;
-  seq.Add(eo, [spaceIt, vertexLabel](float t) {
+  seq.Add(eo, [=](float t) {
     auto* text = spaceIt->GetComponent<Comp::Text>(vertexLabel);
     text->mFillAmount = t;
   });
@@ -345,7 +345,7 @@ void VertexDescription(EventSequence* sequence)
   eo.mName = "MoveVertexSphere";
   eo.mDuration = 1.0f;
   eo.mEase = EaseType::QuadOutIn;
-  seq.Add(eo, [spaceIt, vertexSphere, finalVertexSpherePosition](float t) {
+  seq.Add(eo, [=](float t) {
     auto* transform = spaceIt->GetComponent<Comp::Transform>(vertexSphere);
     transform->SetTranslation(
       Interpolate<Vec3>({0.0f, 0.0f, 0.0f}, finalVertexSpherePosition, t));
@@ -374,7 +374,7 @@ void VertexDescription(EventSequence* sequence)
     eo.mName = "ShowAttributeBox";
     eo.mDuration = 1.0f;
     eo.mEase = EaseType::QuadOutIn;
-    seq.Add(eo, [spaceIt, i, attributeBoxes](float t) {
+    seq.Add(eo, [=](float t) {
       auto* box = spaceIt->GetComponent<Box>(attributeBoxes[i]);
       World::Object boxOwner(&(*spaceIt), attributeBoxes[i]);
       box->mFill = t;
@@ -406,19 +406,13 @@ void VertexDescription(EventSequence* sequence)
     eo.mName = "ExpandConnector";
     eo.mDuration = 1.0f;
     eo.mEase = EaseType::QuadOutIn;
-    seq.Add(
-      eo,
-      [spaceIt,
-       i,
-       finalVertexSpherePosition,
-       connectorEnds,
-       attributeConnectors](float t) {
-        auto* lineComp = spaceIt->GetComponent<Line>(attributeConnectors[i]);
-        World::Object lineOwner(&(*spaceIt), attributeConnectors[i]);
-        lineComp->SetEnd(
-          Interpolate<Vec3>(finalVertexSpherePosition, connectorEnds[i], t),
-          lineOwner);
-      });
+    seq.Add(eo, [=](float t) {
+      auto* lineComp = spaceIt->GetComponent<Line>(attributeConnectors[i]);
+      World::Object lineOwner(&(*spaceIt), attributeConnectors[i]);
+      lineComp->SetEnd(
+        Interpolate<Vec3>(finalVertexSpherePosition, connectorEnds[i], t),
+        lineOwner);
+    });
   }
   seq.Wait();
 
@@ -438,7 +432,7 @@ void VertexDescription(EventSequence* sequence)
   eo.mName = "ShowAttributeLabel";
   eo.mDuration = 1.0f;
   eo.mEase = EaseType::QuadIn;
-  seq.Add(eo, [spaceIt, attributeLabel](float t) {
+  seq.Add(eo, [=](float t) {
     auto* text = spaceIt->GetComponent<Comp::Text>(attributeLabel);
     text->mFillAmount = t;
   });
@@ -467,7 +461,7 @@ void VertexDescription(EventSequence* sequence)
     eo.mName = "ShowAttributeArrow";
     eo.mDuration = 1.0f;
     eo.mEase = EaseType::QuadIn;
-    seq.Add(eo, [spaceIt, attributeArrows, i](float t) {
+    seq.Add(eo, [=](float t) {
       auto* arrow = spaceIt->GetComponent<Arrow>(attributeArrows[i]);
       arrow->mFill = t;
       World::Object arrowOwner(&(*spaceIt), attributeArrows[i]);
@@ -494,7 +488,7 @@ void VertexDescription(EventSequence* sequence)
     eo.mName = "FlashAttribute";
     eo.mDuration = 1.5f;
     eo.mEase = EaseType::QuadOut;
-    seq.Add(eo, [attributeFlashes, i, spaceIt](float t) {
+    seq.Add(eo, [=](float t) {
       t = 1.0f - t;
       auto* color =
         spaceIt->GetComponent<Comp::AlphaColor>(attributeFlashes[i]);
@@ -520,7 +514,7 @@ void VertexDescription(EventSequence* sequence)
   eo.mName = "ShowPosition";
   eo.mDuration = 0.5f;
   eo.mEase = EaseType::QuadIn;
-  seq.Add(eo, [spaceIt, positionLabel](float t) {
+  seq.Add(eo, [=](float t) {
     auto* text = spaceIt->GetComponent<Comp::Text>(positionLabel);
     text->mFillAmount = t;
   });
@@ -548,7 +542,7 @@ void VertexDescription(EventSequence* sequence)
     eo.mName = "ExpressLove";
     eo.mDuration = 0.5f;
     eo.mEase = EaseType::QuadIn;
-    seq.Add(eo, [spaceIt, loveAttributes, i](float t) {
+    seq.Add(eo, [=](float t) {
       auto* transform =
         spaceIt->GetComponent<Comp::Transform>(loveAttributes[i]);
       transform->SetUniformScale(t * 0.9f);
@@ -560,70 +554,53 @@ void VertexDescription(EventSequence* sequence)
   eo.mName = "HideAllExceptPosition";
   eo.mDuration = 1.0f;
   eo.mEase = EaseType::QuadIn;
-  seq.Add(
-    eo,
-    [spaceIt,
-     attributeConnectors,
-     attributeBoxes,
-     attributeArrows,
-     attributeLabel,
-     vertexLabel,
-     vertexBracket,
-     loveAttributes](float t) {
-      float newAlpha = 1.0f - t;
-      for (int i = 0; i < 2; ++i) {
-        auto* color =
-          spaceIt->GetComponent<Comp::AlphaColor>(attributeConnectors[i + 1]);
-        color->mAlphaColor[3] = newAlpha;
-        color = spaceIt->GetComponent<Comp::AlphaColor>(attributeBoxes[i + 1]);
-        color->mAlphaColor[3] = newAlpha;
-        color = spaceIt->GetComponent<Comp::AlphaColor>(loveAttributes[i]);
-        color->mAlphaColor[3] = newAlpha;
-      }
-      for (int i = 0; i < 3; ++i) {
-        auto* color =
-          spaceIt->GetComponent<Comp::AlphaColor>(attributeArrows[i]);
-        color->mAlphaColor[3] = newAlpha;
-      }
-      auto* color = spaceIt->GetComponent<Comp::AlphaColor>(attributeLabel);
+  seq.Add(eo, [=](float t) {
+    float newAlpha = 1.0f - t;
+    for (int i = 0; i < 2; ++i) {
+      auto* color =
+        spaceIt->GetComponent<Comp::AlphaColor>(attributeConnectors[i + 1]);
       color->mAlphaColor[3] = newAlpha;
-      color = spaceIt->GetComponent<Comp::AlphaColor>(vertexLabel);
+      color = spaceIt->GetComponent<Comp::AlphaColor>(attributeBoxes[i + 1]);
       color->mAlphaColor[3] = newAlpha;
-      auto* bracket = spaceIt->GetComponent<Bracket>(vertexBracket);
-      World::Object bracketOwner(&(*spaceIt), vertexBracket);
-      bracket->ChangeColor(bracketOwner, {1.0f, 1.0f, 1.0f, newAlpha});
-    });
+      color = spaceIt->GetComponent<Comp::AlphaColor>(loveAttributes[i]);
+      color->mAlphaColor[3] = newAlpha;
+    }
+    for (int i = 0; i < 3; ++i) {
+      auto* color = spaceIt->GetComponent<Comp::AlphaColor>(attributeArrows[i]);
+      color->mAlphaColor[3] = newAlpha;
+    }
+    auto* color = spaceIt->GetComponent<Comp::AlphaColor>(attributeLabel);
+    color->mAlphaColor[3] = newAlpha;
+    color = spaceIt->GetComponent<Comp::AlphaColor>(vertexLabel);
+    color->mAlphaColor[3] = newAlpha;
+    auto* bracket = spaceIt->GetComponent<Bracket>(vertexBracket);
+    World::Object bracketOwner(&(*spaceIt), vertexBracket);
+    bracket->ChangeColor(bracketOwner, {1.0f, 1.0f, 1.0f, newAlpha});
+  });
   seq.Wait();
 
   eo.mName = "MoveVertexAndPosition";
   eo.mDuration = 1.0f;
   eo.mEase = EaseType::QuadOutIn;
-  seq.Add(
-    eo,
-    [spaceIt,
-     finalVertexSpherePosition,
-     attributeConnectors,
-     attributeBoxes,
-     boxCenters,
-     vertexSphere](float t) {
-      auto* transform = spaceIt->GetComponent<Comp::Transform>(vertexSphere);
-      Vec3 sphereTranslation =
-        Interpolate<Vec3>(finalVertexSpherePosition, {-5.5f, 3.5f, 0.0f}, t);
-      transform->SetTranslation(sphereTranslation);
+  seq.Add(eo, [=](float t) {
+    auto* transform = spaceIt->GetComponent<Comp::Transform>(vertexSphere);
+    Vec3 sphereTranslation =
+      Interpolate<Vec3>(finalVertexSpherePosition, {-5.5f, 3.5f, 0.0f}, t);
+    transform->SetTranslation(sphereTranslation);
 
-      transform = spaceIt->GetComponent<Comp::Transform>(attributeBoxes[0]);
-      Vec3 boxTranslation =
-        Interpolate<Vec3>(boxCenters[0], {0.0f, 3.5f, 0.0f}, t);
-      transform->SetTranslation(boxTranslation);
+    transform = spaceIt->GetComponent<Comp::Transform>(attributeBoxes[0]);
+    Vec3 boxTranslation =
+      Interpolate<Vec3>(boxCenters[0], {0.0f, 3.5f, 0.0f}, t);
+    transform->SetTranslation(boxTranslation);
 
-      World::Object lineOwner(&(*spaceIt), attributeConnectors[0]);
-      auto* line = lineOwner.GetComponent<Line>();
-      line->mStart = sphereTranslation;
-      line->mEnd = boxTranslation;
-      line->mEnd[0] -= 2.5f;
-      line->mEnd[2] = -0.1f;
-      line->UpdateTransform(lineOwner);
-    });
+    World::Object lineOwner(&(*spaceIt), attributeConnectors[0]);
+    auto* line = lineOwner.GetComponent<Line>();
+    line->mStart = sphereTranslation;
+    line->mEnd = boxTranslation;
+    line->mEnd[0] -= 2.5f;
+    line->mEnd[2] = -0.1f;
+    line->UpdateTransform(lineOwner);
+  });
 
   // I am really starting to think that all elements should be created at the
   // start of a group. It does not mean you need to create all of the elements
