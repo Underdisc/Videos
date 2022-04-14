@@ -402,13 +402,13 @@ Introduction nIntroduction;
 
 */
 
-EventSequence gEventSequence;
+Sequence gSequence;
 void CentralUpdate()
 {
   if (Input::KeyPressed(Input::Key::Space)) {
-    gEventSequence.Continue();
+    gSequence.Continue();
   }
-  gEventSequence.Update(Temporal::DeltaTime());
+  gSequence.Update(Temporal::DeltaTime());
 }
 
 void RegisterTypes()
@@ -429,7 +429,7 @@ int main(int argc, char* argv[])
     return 0;
   }
 
-  TheFundamentalsOfGraphics(&gEventSequence);
+  TheFundamentalsOfGraphics(&gSequence);
   World::nCentralUpdate = CentralUpdate;
   VarkorRun();
 

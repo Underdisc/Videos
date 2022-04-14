@@ -22,21 +22,15 @@ enum class EaseType
 };
 float Ease(float t, EaseType easeType);
 
-struct EventSequence
+struct Sequence
 {
+  Sequence();
   enum class Status
   {
     Start,
     Perform,
     End,
     Pause
-  };
-
-  struct Options
-  {
-    std::string mName;
-    float mDuration;
-    EaseType mEase;
   };
 
   struct Event
@@ -56,11 +50,15 @@ struct EventSequence
     float mTimeAfter;
   };
 
-  void Add(const Options& options, std::function<void(float t)> function);
+  struct AddOptions
+  {
+    std::string mName;
+    float mDuration;
+    EaseType mEase;
+  };
+  void Add(const AddOptions& options, std::function<void(float t)> function);
   void Gap(float duration);
   void Wait();
-
-  EventSequence();
 
   void Continue();
   void Pause();

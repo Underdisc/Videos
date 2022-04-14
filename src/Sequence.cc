@@ -1,6 +1,6 @@
 #include <Error.h>
 
-#include "EventSequence.h"
+#include "Sequence.h"
 
 float Ease(float t, EaseType easeType)
 {
@@ -32,30 +32,29 @@ float Ease(float t, EaseType easeType)
   return t;
 }
 
-void EventSequence::Event::Run(float t) const
+void Sequence::Event::Run(float t) const
 {
   if (mFunction) {
     mFunction(t);
   }
 }
 
-EventSequence::EventSequence():
+Sequence::Sequence():
   mStatus(Status::Start), mTimeAfter(0.0f), mNextInactiveEvent(0)
 {}
 
-void EventSequence::Add(
-  const Options& eo, std::function<void(float t)> function)
+void Sequence::Add(const AddOptions& ao, std::function<void(float t)> function)
 {
   Event newEvent;
-  newEvent.mName = eo.mName;
+  newEvent.mName = ao.mName;
   newEvent.mTimeUntil = 0.0f;
-  newEvent.mDuration = eo.mDuration;
-  newEvent.mEase = eo.mEase;
+  newEvent.mDuration = ao.mDuration;
+  newEvent.mEase = ao.mEase;
   newEvent.mFunction = function;
   mEvents.Push(newEvent);
 }
 
-void EventSequence::Gap(float duration)
+void Sequence::Gap(float duration)
 {
   Event newEvent;
   newEvent.mName = "Gap";
@@ -64,23 +63,23 @@ void EventSequence::Gap(float duration)
   mEvents.Push(newEvent);
 }
 
-void EventSequence::Wait()
+void Sequence::Wait()
 {
   LogAbortIf(mEvents.Size() == 0, "One existing event required to wait.");
   Gap(mEvents.Top().mDuration);
 }
 
-void EventSequence::Continue()
+void Sequence::Continue()
 {
   mStatus = Status::Perform;
 }
 
-void EventSequence::Pause()
+void Sequence::Pause()
 {
   mStatus = Status::Pause;
 }
 
-void EventSequence::Update(float dt)
+void Sequence::Update(float dt)
 {
   if (mStatus != Status::Perform) {
     return;

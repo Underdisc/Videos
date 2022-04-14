@@ -8,7 +8,7 @@
 #include <math/Utility.h>
 #include <world/World.h>
 
-#include "EventSequence.h"
+#include "Sequence.h"
 
 #include <iostream>
 
@@ -204,9 +204,9 @@ struct Arrow
   }
 };
 
-void VertexDescription(EventSequence* sequence)
+void VertexDescription(Sequence* sequence)
 {
-  EventSequence& seq = *sequence;
+  Sequence& seq = *sequence;
   World::SpaceIt spaceIt = World::CreateTopSpace();
   World::MemberId cameraId = spaceIt->CreateMember();
   Comp::Camera& camera = spaceIt->AddComponent<Comp::Camera>(cameraId);
@@ -232,11 +232,11 @@ void VertexDescription(EventSequence* sequence)
     auto& colorComp = spaceIt->AddComponent<Comp::AlphaColor>(vertexLines[i]);
     colorComp.mAlphaColor = {1.0f, 1.0f, 1.0f, 1.0f};
   }
-  EventSequence::Options eo;
-  eo.mName = "ExpandVertexLines";
-  eo.mDuration = 1.0f;
-  eo.mEase = EaseType::QuadIn;
-  seq.Add(eo, [=](float t) {
+  Sequence::AddOptions ao;
+  ao.mName = "ExpandVertexLines";
+  ao.mDuration = 1.0f;
+  ao.mEase = EaseType::QuadIn;
+  seq.Add(ao, [=](float t) {
     float angleIncrement = Math::nPi / 4.0f;
     float angle = 0.0f;
     for (int i = 0; i < 8; ++i) {
@@ -256,10 +256,10 @@ void VertexDescription(EventSequence* sequence)
   });
   seq.Wait();
 
-  eo.mName = "ShrinkVertexLines";
-  eo.mDuration = 1.0f;
-  eo.mEase = EaseType::QuadOut;
-  seq.Add(eo, [=](float t) {
+  ao.mName = "ShrinkVertexLines";
+  ao.mDuration = 1.0f;
+  ao.mEase = EaseType::QuadOut;
+  seq.Add(ao, [=](float t) {
     float angleIncrement = Math::nPi / 4.0f;
     float angle = 0.0f;
     for (int i = 0; i < 8; ++i) {
@@ -285,10 +285,10 @@ void VertexDescription(EventSequence* sequence)
     auto* transform = spaceIt->GetComponent<Comp::Transform>(vertexSphere);
     transform->SetUniformScale(0.0f);
   }
-  eo.mName = "ExpandVertexSphere";
-  eo.mDuration = 1.0f;
-  eo.mEase = EaseType::QuadIn;
-  seq.Add(eo, [=](float t) {
+  ao.mName = "ExpandVertexSphere";
+  ao.mDuration = 1.0f;
+  ao.mEase = EaseType::QuadIn;
+  seq.Add(ao, [=](float t) {
     auto& transform = *spaceIt->GetComponent<Comp::Transform>(vertexSphere);
     transform.SetUniformScale(t);
   });
@@ -303,10 +303,10 @@ void VertexDescription(EventSequence* sequence)
     World::Object bracketOwner(&(*spaceIt), vertexBracket);
     bracket.UpdateRepresentation(bracketOwner);
   }
-  eo.mName = "ExpandVertexBracket";
-  eo.mDuration = 0.75;
-  eo.mEase = EaseType::QuadIn;
-  seq.Add(eo, [=](float t) {
+  ao.mName = "ExpandVertexBracket";
+  ao.mDuration = 0.75;
+  ao.mEase = EaseType::QuadIn;
+  seq.Add(ao, [=](float t) {
     auto& bracket = *spaceIt->GetComponent<Bracket>(vertexBracket);
     bracket.mFill = -t;
     World::Object bracketOwner(&(*spaceIt), vertexBracket);
@@ -331,10 +331,10 @@ void VertexDescription(EventSequence* sequence)
     auto& color = spaceIt->AddComponent<Comp::AlphaColor>(vertexLabel);
     color.mAlphaColor = {1.0f, 1.0f, 1.0f, 1.0f};
   }
-  eo.mName = "ShowVertexLabel";
-  eo.mDuration = 0.5f;
-  eo.mEase = EaseType::QuadIn;
-  seq.Add(eo, [=](float t) {
+  ao.mName = "ShowVertexLabel";
+  ao.mDuration = 0.5f;
+  ao.mEase = EaseType::QuadIn;
+  seq.Add(ao, [=](float t) {
     auto* text = spaceIt->GetComponent<Comp::Text>(vertexLabel);
     text->mFillAmount = t;
   });
@@ -342,10 +342,10 @@ void VertexDescription(EventSequence* sequence)
   seq.Gap(0.5f);
 
   Vec3 finalVertexSpherePosition = {-5.5f, 0.0f, 0.0f};
-  eo.mName = "MoveVertexSphere";
-  eo.mDuration = 1.0f;
-  eo.mEase = EaseType::QuadOutIn;
-  seq.Add(eo, [=](float t) {
+  ao.mName = "MoveVertexSphere";
+  ao.mDuration = 1.0f;
+  ao.mEase = EaseType::QuadOutIn;
+  seq.Add(ao, [=](float t) {
     auto* transform = spaceIt->GetComponent<Comp::Transform>(vertexSphere);
     transform->SetTranslation(
       Interpolate<Vec3>({0.0f, 0.0f, 0.0f}, finalVertexSpherePosition, t));
@@ -371,10 +371,10 @@ void VertexDescription(EventSequence* sequence)
     auto* model = spaceIt->GetComponent<Comp::Model>(attributeBoxes[i]);
     model->mShaderId = AssLib::nColorShaderId;
     seq.Gap(0.15f);
-    eo.mName = "ShowAttributeBox";
-    eo.mDuration = 1.0f;
-    eo.mEase = EaseType::QuadOutIn;
-    seq.Add(eo, [=](float t) {
+    ao.mName = "ShowAttributeBox";
+    ao.mDuration = 1.0f;
+    ao.mEase = EaseType::QuadOutIn;
+    seq.Add(ao, [=](float t) {
       auto* box = spaceIt->GetComponent<Box>(attributeBoxes[i]);
       World::Object boxOwner(&(*spaceIt), attributeBoxes[i]);
       box->mFill = t;
@@ -403,10 +403,10 @@ void VertexDescription(EventSequence* sequence)
       spaceIt->AddComponent<Comp::AlphaColor>(attributeConnectors[i]);
     colorComp.mAlphaColor = {1.0f, 1.0f, 1.0f, 1.0f};
     seq.Gap(0.1f);
-    eo.mName = "ExpandConnector";
-    eo.mDuration = 1.0f;
-    eo.mEase = EaseType::QuadOutIn;
-    seq.Add(eo, [=](float t) {
+    ao.mName = "ExpandConnector";
+    ao.mDuration = 1.0f;
+    ao.mEase = EaseType::QuadOutIn;
+    seq.Add(ao, [=](float t) {
       auto* lineComp = spaceIt->GetComponent<Line>(attributeConnectors[i]);
       World::Object lineOwner(&(*spaceIt), attributeConnectors[i]);
       lineComp->SetEnd(
@@ -429,10 +429,10 @@ void VertexDescription(EventSequence* sequence)
     auto& color = spaceIt->AddComponent<Comp::AlphaColor>(attributeLabel);
     color.mAlphaColor = {1.0f, 1.0f, 1.0f, 1.0f};
   }
-  eo.mName = "ShowAttributeLabel";
-  eo.mDuration = 1.0f;
-  eo.mEase = EaseType::QuadIn;
-  seq.Add(eo, [=](float t) {
+  ao.mName = "ShowAttributeLabel";
+  ao.mDuration = 1.0f;
+  ao.mEase = EaseType::QuadIn;
+  seq.Add(ao, [=](float t) {
     auto* text = spaceIt->GetComponent<Comp::Text>(attributeLabel);
     text->mFillAmount = t;
   });
@@ -458,10 +458,10 @@ void VertexDescription(EventSequence* sequence)
     auto* model = spaceIt->GetComponent<Comp::Model>(attributeArrows[i]);
     model->mShaderId = AssLib::nColorShaderId;
     seq.Gap(0.1f);
-    eo.mName = "ShowAttributeArrow";
-    eo.mDuration = 1.0f;
-    eo.mEase = EaseType::QuadIn;
-    seq.Add(eo, [=](float t) {
+    ao.mName = "ShowAttributeArrow";
+    ao.mDuration = 1.0f;
+    ao.mEase = EaseType::QuadIn;
+    seq.Add(ao, [=](float t) {
       auto* arrow = spaceIt->GetComponent<Arrow>(attributeArrows[i]);
       arrow->mFill = t;
       World::Object arrowOwner(&(*spaceIt), attributeArrows[i]);
@@ -485,10 +485,10 @@ void VertexDescription(EventSequence* sequence)
     auto& color = spaceIt->AddComponent<Comp::AlphaColor>(attributeFlashes[i]);
     color.mAlphaColor = {1.0f, 1.0f, 1.0f, 0.0f};
     seq.Gap(0.25f);
-    eo.mName = "FlashAttribute";
-    eo.mDuration = 1.5f;
-    eo.mEase = EaseType::QuadOut;
-    seq.Add(eo, [=](float t) {
+    ao.mName = "FlashAttribute";
+    ao.mDuration = 1.5f;
+    ao.mEase = EaseType::QuadOut;
+    seq.Add(ao, [=](float t) {
       t = 1.0f - t;
       auto* color =
         spaceIt->GetComponent<Comp::AlphaColor>(attributeFlashes[i]);
@@ -511,10 +511,10 @@ void VertexDescription(EventSequence* sequence)
     auto& color = spaceIt->AddComponent<Comp::AlphaColor>(positionLabel);
     color.mAlphaColor = {1.0f, 1.0f, 1.0f, 1.0f};
   }
-  eo.mName = "ShowPosition";
-  eo.mDuration = 0.5f;
-  eo.mEase = EaseType::QuadIn;
-  seq.Add(eo, [=](float t) {
+  ao.mName = "ShowPosition";
+  ao.mDuration = 0.5f;
+  ao.mEase = EaseType::QuadIn;
+  seq.Add(ao, [=](float t) {
     auto* text = spaceIt->GetComponent<Comp::Text>(positionLabel);
     text->mFillAmount = t;
   });
@@ -539,10 +539,10 @@ void VertexDescription(EventSequence* sequence)
     transform->SetTranslation(translation);
     transform->SetUniformScale(0.0f);
     seq.Gap(0.25f);
-    eo.mName = "ExpressLove";
-    eo.mDuration = 0.5f;
-    eo.mEase = EaseType::QuadIn;
-    seq.Add(eo, [=](float t) {
+    ao.mName = "ExpressLove";
+    ao.mDuration = 0.5f;
+    ao.mEase = EaseType::QuadIn;
+    seq.Add(ao, [=](float t) {
       auto* transform =
         spaceIt->GetComponent<Comp::Transform>(loveAttributes[i]);
       transform->SetUniformScale(t * 0.9f);
@@ -551,10 +551,10 @@ void VertexDescription(EventSequence* sequence)
   seq.Wait();
   seq.Gap(0.5f);
 
-  eo.mName = "HideAllExceptPosition";
-  eo.mDuration = 1.0f;
-  eo.mEase = EaseType::QuadIn;
-  seq.Add(eo, [=](float t) {
+  ao.mName = "HideAllExceptPosition";
+  ao.mDuration = 1.0f;
+  ao.mEase = EaseType::QuadIn;
+  seq.Add(ao, [=](float t) {
     float newAlpha = 1.0f - t;
     for (int i = 0; i < 2; ++i) {
       auto* color =
@@ -579,10 +579,10 @@ void VertexDescription(EventSequence* sequence)
   });
   seq.Wait();
 
-  eo.mName = "MoveVertexAndPosition";
-  eo.mDuration = 1.0f;
-  eo.mEase = EaseType::QuadOutIn;
-  seq.Add(eo, [=](float t) {
+  ao.mName = "MoveVertexAndPosition";
+  ao.mDuration = 1.0f;
+  ao.mEase = EaseType::QuadOutIn;
+  seq.Add(ao, [=](float t) {
     auto* transform = spaceIt->GetComponent<Comp::Transform>(vertexSphere);
     Vec3 sphereTranslation =
       Interpolate<Vec3>(finalVertexSpherePosition, {-5.5f, 3.5f, 0.0f}, t);
@@ -601,19 +601,9 @@ void VertexDescription(EventSequence* sequence)
     line->mEnd[2] = -0.1f;
     line->UpdateTransform(lineOwner);
   });
-
-  // I am really starting to think that all elements should be created at the
-  // start of a group. It does not mean you need to create all of the elements
-  // for an entire video, but you do need to create all of the elements for
-  // one part of the video.
-  // seq.Add("DeleteVertexLines", 0.0f, [this](float t) {
-  //   for (int i = 0; i < 8; ++i) {
-  //     mSpaceIt->DeleteMember(vertexLines[i]);
-  //   }
-  // });
 }
 
-void TheFundamentalsOfGraphics(EventSequence* sequence)
+void TheFundamentalsOfGraphics(Sequence* sequence)
 {
   VertexDescription(sequence);
 }
