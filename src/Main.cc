@@ -419,6 +419,7 @@ void RegisterTypes()
   Registrar::Register<Bracket, Comp::Transform>();
   Registrar::Register<Box, Comp::Model>();
   Registrar::Register<Arrow, Comp::Model>();
+  Registrar::Register<Table, Comp::Transform>();
 }
 
 int main(int argc, char* argv[])

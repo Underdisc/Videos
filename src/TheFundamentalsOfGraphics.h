@@ -20,9 +20,9 @@ struct Line
 
   void VInit(const World::Object& owner)
   {
-    mThickness = 0.1f;
-    mStart = {-1.0f, 0.0f, 0.0f};
-    mEnd = {1.0f, 0.0f, 0.0f};
+    mThickness = 0.2f;
+    mStart = {0.0f, 0.0f, 0.0f};
+    mEnd = {0.0f, 0.0f, 0.0f};
 
     Comp::Model* model = owner.GetComponent<Comp::Model>();
     model->mModelId = AssLib::nCubeModelId;
@@ -33,10 +33,15 @@ struct Line
     Comp::Transform* transform = owner.GetComponent<Comp::Transform>();
     Vec3 direction = mEnd - mStart;
     float directionMag = Math::Magnitude(direction);
+    if (Math::Near(directionMag, 0.0f)) {
+      transform->SetUniformScale(0.0f);
+      return;
+    }
     Math::Quaternion rotation;
     rotation.FromTo({1.0f, 0.0f, 0.0f}, direction / directionMag);
     transform->SetRotation(rotation);
-    transform->SetScale({directionMag / 2.0f, mThickness, mThickness});
+    transform->SetScale(
+      {directionMag / 2.0f, mThickness / 2.0f, mThickness / 2.0f});
     transform->SetTranslation(mStart + direction / 2.0f);
   }
 
@@ -50,6 +55,12 @@ struct Line
   {
     mEnd = end;
     UpdateTransform(owner);
+  }
+
+  void Hide(const World::Object& owner)
+  {
+    auto* model = owner.GetComponent<Comp::Model>();
+    model->mVisible = false;
   }
 };
 
@@ -125,6 +136,14 @@ struct Bracket
     transform->SetRotation(extentRotation);
     transform->SetTranslation(mCenter);
   }
+
+  void Hide(const World::Object& owner)
+  {
+    auto* model = owner.mSpace->GetComponent<Comp::Model>(mLeftChild);
+    model->mVisible = false;
+    model = owner.mSpace->GetComponent<Comp::Model>(mRightChild);
+    model->mVisible = false;
+  }
 };
 
 struct Box
@@ -169,6 +188,12 @@ struct Box
     auto* transform = owner.GetComponent<Comp::Transform>();
     transform->SetTranslation(mCenter);
   }
+
+  void Hide(const World::Object& owner)
+  {
+    auto* model = owner.GetComponent<Comp::Model>();
+    model->mVisible = false;
+  }
 };
 
 struct Arrow
@@ -201,6 +226,90 @@ struct Arrow
       0.2f,
       Gfx::TerminalType::CollapsedBinormal,
       Gfx::TerminalType::Arrow);
+  }
+
+  void Hide(const World::Object& owner)
+  {
+    auto* model = owner.GetComponent<Comp::Model>();
+    model->mVisible = false;
+  }
+};
+
+struct Table
+{
+  Vec3 mCenter;
+  float mCellWidth;
+  float mCellHeight;
+  unsigned int mCount;
+  float mFill;
+  float mThickness;
+
+  void VInit(const World::Object& owner)
+  {
+    mCenter = {0.0f, 0.0f, 0.0f};
+    mCellWidth = 2.0f;
+    mCellHeight = 1.0f;
+    mCount = 1;
+    mFill = 0.0f;
+    mThickness = 0.2f;
+
+    UpdateRep(owner);
+  }
+
+  void UpdateRep(const World::Object& owner)
+  {
+    auto* transform = owner.GetComponent<Comp::Transform>();
+    transform->SetTranslation(mCenter);
+
+    // Make sure the parent has the correct number of children.
+    int requiredChildren = 4 + (mCount - 1);
+    for (int i = (int)owner.Children().Size(); i < requiredChildren; ++i) {
+      World::Object child = owner.CreateChild();
+      child.AddComponent<Line>();
+    }
+    for (int i = (int)owner.Children().Size() - 1; i >= requiredChildren; ++i) {
+      owner.mSpace->DeleteMember(owner.Children()[i]);
+    }
+
+    float height = mCellHeight * mCount - (mCount - 1) * mThickness;
+    float halfHeight = height / 2.0f;
+    float halfWidth = mCellWidth / 2.0f;
+
+    // Horizontal Lines.
+    float heightDiff = mCellHeight - mThickness;
+    float currentOffset = halfHeight - mThickness / 2.0f;
+    for (int i = 0; i < (int)mCount + 1; ++i) {
+      auto* line = owner.mSpace->GetComponent<Line>(owner.Children()[i]);
+      line->mStart = {mFill * halfWidth, currentOffset, 0.0f};
+      line->mEnd = {-mFill * halfWidth, currentOffset, 0.0f};
+      line->mThickness = mThickness;
+      World::Object childOwner(owner.mSpace, owner.Children()[i]);
+      line->UpdateTransform(childOwner);
+      currentOffset -= heightDiff;
+    }
+
+    // Vertical Lines.
+    float widthDiff = mCellWidth - mThickness;
+    currentOffset = halfWidth - mThickness / 2.0f;
+    for (int i = 0; i < 2; ++i) {
+      int index = (int)mCount + 1 + i;
+      auto* line = owner.mSpace->GetComponent<Line>(owner.Children()[index]);
+      line->mStart = {currentOffset, mFill * halfHeight, 0.0f};
+      line->mEnd = {currentOffset, -mFill * halfHeight, 0.0f};
+      line->mThickness = mThickness;
+      World::Object childOwner(owner.mSpace, owner.Children()[index]);
+      line->UpdateTransform(childOwner);
+      currentOffset -= widthDiff;
+    }
+  }
+
+  void Hide(const World::Object& owner)
+  {
+    for (int i = 0; i < (int)owner.Children().Size(); ++i) {
+      auto* model =
+        owner.mSpace->GetComponent<Comp::Model>(owner.Children()[i]);
+      model->mVisible = false;
+    }
   }
 };
 
@@ -393,7 +502,7 @@ void VertexDescription(Sequence* sequence)
     auto& line = spaceIt->AddComponent<Line>(attributeConnectors[i]);
     line.mStart = finalVertexSpherePosition;
     line.mEnd = finalVertexSpherePosition;
-    line.mThickness = 0.07f;
+    line.mThickness = 0.14f;
     World::Object lineOwner(&(*spaceIt), attributeConnectors[i]);
     line.UpdateTransform(lineOwner);
     auto* lineModel =
@@ -551,7 +660,7 @@ void VertexDescription(Sequence* sequence)
   seq.Wait();
   seq.Gap(0.5f);
 
-  ao.mName = "HideAllExceptPosition";
+  ao.mName = "FadeAllExceptPosition";
   ao.mDuration = 1.0f;
   ao.mEase = EaseType::QuadIn;
   seq.Add(ao, [=](float t) {
@@ -579,6 +688,38 @@ void VertexDescription(Sequence* sequence)
   });
   seq.Wait();
 
+  ao.mName = "HideFadedElements";
+  ao.mDuration = 0.0f;
+  seq.Add(ao, [=](float t) {
+    for (int i = 0; i < 2; ++i) {
+      // I will sooon turn this.
+      auto* line = spaceIt->GetComponent<Line>(attributeConnectors[i + 1]);
+      World::Object lineOwner(&(*spaceIt), attributeConnectors[i + 1]);
+      line->Hide(lineOwner);
+      // Into this.
+      // attributeConnects[i + 1].Get<Line>.Hide(attributeConnectors[i+1]))
+      // Would be cool if I didn't have to pass the object in again.
+      // But boom, this would really simplify a lot of code.
+      auto* box = spaceIt->GetComponent<Box>(attributeBoxes[i + 1]);
+      World::Object boxOwner(&(*spaceIt), attributeBoxes[i + 1]);
+      box->Hide(boxOwner);
+      auto* model = spaceIt->GetComponent<Comp::Model>(loveAttributes[i]);
+      model->mVisible = false;
+    }
+    for (int i = 0; i < 3; ++i) {
+      auto* arrow = spaceIt->GetComponent<Arrow>(attributeArrows[i]);
+      World::Object lineOwner(&(*spaceIt), attributeArrows[i]);
+      arrow->Hide(lineOwner);
+    }
+    auto* text = spaceIt->GetComponent<Comp::Text>(attributeLabel);
+    text->mVisible = false;
+    text = spaceIt->GetComponent<Comp::Text>(vertexLabel);
+    text->mVisible = false;
+    auto* bracket = spaceIt->GetComponent<Bracket>(vertexBracket);
+    World::Object bracketOwner(&(*spaceIt), vertexBracket);
+    bracket->Hide(bracketOwner);
+  });
+
   ao.mName = "MoveVertexAndPosition";
   ao.mDuration = 1.0f;
   ao.mEase = EaseType::QuadOutIn;
@@ -601,6 +742,26 @@ void VertexDescription(Sequence* sequence)
     line->mEnd[2] = -0.1f;
     line->UpdateTransform(lineOwner);
   });
+  seq.Wait();
+
+  World::MemberId positionTable2D = spaceIt->CreateMember();
+  {
+    auto& table2D = spaceIt->AddComponent<Table>(positionTable2D);
+    table2D.mCenter = {1.0f, 1.0f, 0.0f};
+    table2D.mCount = 2;
+    table2D.mCellWidth = 4.0f;
+    table2D.mCellHeight = 1.5f;
+  }
+  ao.mName = "Show2DPositionTable";
+  ao.mDuration = 1.0f;
+  ao.mEase = EaseType::QuadIn;
+  seq.Add(ao, [=](float t) {
+    auto* table2D = spaceIt->GetComponent<Table>(positionTable2D);
+    table2D->mFill = t;
+    World::Object tableOwner(&(*spaceIt), positionTable2D);
+    table2D->UpdateRep(tableOwner);
+  });
+  seq.Wait();
 }
 
 void TheFundamentalsOfGraphics(Sequence* sequence)
