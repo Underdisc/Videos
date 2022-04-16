@@ -317,28 +317,26 @@ void VertexDescription(Sequence* sequence)
 {
   Sequence& seq = *sequence;
   World::SpaceIt spaceIt = World::CreateTopSpace();
-  World::MemberId cameraId = spaceIt->CreateMember();
-  Comp::Camera& camera = spaceIt->AddComponent<Comp::Camera>(cameraId);
-  camera.mProjectionType = Comp::Camera::ProjectionType::Orthographic;
-  camera.mHeight = 10.0f;
-  Comp::Transform& cameraTransform =
-    *spaceIt->GetComponent<Comp::Transform>(cameraId);
+  World::Object camera = spaceIt->CreateObject();
+  Comp::Camera& cameraComp = camera.AddComponent<Comp::Camera>();
+  cameraComp.mProjectionType = Comp::Camera::ProjectionType::Orthographic;
+  cameraComp.mHeight = 10.0f;
+  Comp::Transform& cameraTransform = *camera.GetComponent<Comp::Transform>();
   cameraTransform.SetTranslation({0.0f, 0.0f, 10.0f});
-  World::Object cameraObject(&(*spaceIt), cameraId);
-  camera.LocalLookAt({0.0f, 0.0f, 0.0f}, {0.0f, 1.0f, 0.0f}, cameraObject);
-  spaceIt->mCameraId = cameraId;
+  cameraComp.LocalLookAt({0.0f, 0.0f, 0.0f}, {0.0f, 1.0f, 0.0f}, camera);
+  spaceIt->mCameraId = camera.mMemberId;
 
-  World::MemberId vertexLines[8];
+  World::Object vertexLines[8];
   for (int i = 0; i < 8; ++i) {
-    vertexLines[i] = spaceIt->CreateMember();
-    auto& line = spaceIt->AddComponent<Line>(vertexLines[i]);
+    vertexLines[i] = spaceIt->CreateObject();
+    auto& line = vertexLines[i].AddComponent<Line>();
     line.mEnd = {0.0f, 0.0f, 0.0f};
     line.mStart = {0.0f, 0.0f, 0.0f};
-    World::Object lineOwner(&(*spaceIt), vertexLines[i]);
-    line.UpdateTransform(lineOwner);
-    auto* model = spaceIt->GetComponent<Comp::Model>(vertexLines[i]);
+    line.UpdateTransform(vertexLines[i]);
+
+    auto* model = vertexLines[i].GetComponent<Comp::Model>();
     model->mShaderId = AssLib::nColorShaderId;
-    auto& colorComp = spaceIt->AddComponent<Comp::AlphaColor>(vertexLines[i]);
+    auto& colorComp = vertexLines[i].AddComponent<Comp::AlphaColor>();
     colorComp.mAlphaColor = {1.0f, 1.0f, 1.0f, 1.0f};
   }
   Sequence::AddOptions ao;
@@ -356,10 +354,9 @@ void VertexDescription(Sequence* sequence)
       Vec3 start = {cosAngle * startDistance, sinAngle * startDistance, 0.0f};
       Vec3 end = {cosAngle * endDistance, sinAngle * endDistance, 0.0f};
 
-      World::Object owner(&(*spaceIt), vertexLines[i]);
-      Line& line = *owner.GetComponent<Line>();
-      line.SetStart(start, owner);
-      line.SetEnd(end, owner);
+      Line& line = *vertexLines[i].GetComponent<Line>();
+      line.SetStart(start, vertexLines[i]);
+      line.SetEnd(end, vertexLines[i]);
       angle += angleIncrement;
     }
   });
@@ -379,47 +376,44 @@ void VertexDescription(Sequence* sequence)
       Vec3 start = {cosAngle * startDistance, sinAngle * startDistance, 0.0f};
       Vec3 end = {cosAngle * endDistance, sinAngle * endDistance, 0.0f};
 
-      World::Object owner(&(*spaceIt), vertexLines[i]);
-      Line& line = *owner.GetComponent<Line>();
-      line.SetStart(start, owner);
-      line.SetEnd(end, owner);
+      Line& line = *vertexLines[i].GetComponent<Line>();
+      line.SetStart(start, vertexLines[i]);
+      line.SetEnd(end, vertexLines[i]);
       angle += angleIncrement;
     }
   });
 
-  World::MemberId vertexSphere = spaceIt->CreateMember();
+  World::Object vertexSphere = spaceIt->CreateObject();
   {
-    auto& model = spaceIt->AddComponent<Comp::Model>(vertexSphere);
+    auto& model = vertexSphere.AddComponent<Comp::Model>();
     model.mModelId = AssLib::nSphereModelId;
-    auto* transform = spaceIt->GetComponent<Comp::Transform>(vertexSphere);
+    auto* transform = vertexSphere.GetComponent<Comp::Transform>();
     transform->SetUniformScale(0.0f);
   }
   ao.mName = "ExpandVertexSphere";
   ao.mDuration = 1.0f;
   ao.mEase = EaseType::QuadIn;
   seq.Add(ao, [=](float t) {
-    auto& transform = *spaceIt->GetComponent<Comp::Transform>(vertexSphere);
+    auto& transform = *vertexSphere.GetComponent<Comp::Transform>();
     transform.SetUniformScale(t);
   });
   seq.Wait();
   seq.Gap(0.5f);
 
-  World::MemberId vertexBracket = spaceIt->CreateChildMember(vertexSphere);
+  World::Object vertexBracket = spaceIt->CreateChildObject(vertexSphere);
   {
-    auto& bracket = spaceIt->AddComponent<Bracket>(vertexBracket);
+    auto& bracket = vertexBracket.AddComponent<Bracket>();
     bracket.mFill = 0.0f;
     bracket.mCenter = {0.0f, 1.5f, 0.0f};
-    World::Object bracketOwner(&(*spaceIt), vertexBracket);
-    bracket.UpdateRepresentation(bracketOwner);
+    bracket.UpdateRepresentation(vertexBracket);
   }
   ao.mName = "ExpandVertexBracket";
   ao.mDuration = 0.75;
   ao.mEase = EaseType::QuadIn;
   seq.Add(ao, [=](float t) {
-    auto& bracket = *spaceIt->GetComponent<Bracket>(vertexBracket);
+    auto& bracket = *vertexBracket.GetComponent<Bracket>();
     bracket.mFill = -t;
-    World::Object bracketOwner(&(*spaceIt), vertexBracket);
-    bracket.UpdateRepresentation(bracketOwner);
+    bracket.UpdateRepresentation(vertexBracket);
   });
   seq.Wait();
 
@@ -427,24 +421,24 @@ void VertexDescription(Sequence* sequence)
   AssLib::Asset<Gfx::Font>& font = AssLib::GetAsset<Gfx::Font>(fugazId);
   font.mPaths.Push("font/fugazOne/font.ttf");
   font.FullInit();
-  World::MemberId vertexLabel = spaceIt->CreateChildMember(vertexSphere);
+  World::Object vertexLabel = spaceIt->CreateChildObject(vertexSphere);
   {
-    auto& text = spaceIt->AddComponent<Comp::Text>(vertexLabel);
+    auto& text = vertexLabel.AddComponent<Comp::Text>();
     text.mAlign = Comp::Text::Alignment::Center;
     text.mFillAmount = 0.0f;
     text.mText = "Vertex";
     text.mFontId = fugazId;
-    auto* transform = spaceIt->GetComponent<Comp::Transform>(vertexLabel);
+    auto* transform = vertexLabel.GetComponent<Comp::Transform>();
     transform->SetTranslation({0.0f, 2.0f, 0.0f});
     transform->SetUniformScale(0.7f);
-    auto& color = spaceIt->AddComponent<Comp::AlphaColor>(vertexLabel);
+    auto& color = vertexLabel.AddComponent<Comp::AlphaColor>();
     color.mAlphaColor = {1.0f, 1.0f, 1.0f, 1.0f};
   }
   ao.mName = "ShowVertexLabel";
   ao.mDuration = 0.5f;
   ao.mEase = EaseType::QuadIn;
   seq.Add(ao, [=](float t) {
-    auto* text = spaceIt->GetComponent<Comp::Text>(vertexLabel);
+    auto* text = vertexLabel.GetComponent<Comp::Text>();
     text->mFillAmount = t;
   });
   seq.Wait();
@@ -455,99 +449,93 @@ void VertexDescription(Sequence* sequence)
   ao.mDuration = 1.0f;
   ao.mEase = EaseType::QuadOutIn;
   seq.Add(ao, [=](float t) {
-    auto* transform = spaceIt->GetComponent<Comp::Transform>(vertexSphere);
+    auto* transform = vertexSphere.GetComponent<Comp::Transform>();
     transform->SetTranslation(
       Interpolate<Vec3>({0.0f, 0.0f, 0.0f}, finalVertexSpherePosition, t));
   });
   seq.Wait();
 
-  World::MemberId attributeBoxes[3];
+  World::Object attributeBoxes[3];
   Vec3 boxCenters[3];
   boxCenters[0] = {0.0f, 2.0f, 0.0f};
   boxCenters[1] = {0.0f, 0.0f, 0.0f};
   boxCenters[2] = {0.0f, -2.0f, 0.0f};
   for (int i = 0; i < 3; ++i) {
-    attributeBoxes[i] = spaceIt->CreateMember();
-    auto& box = spaceIt->AddComponent<Box>(attributeBoxes[i]);
+    attributeBoxes[i] = spaceIt->CreateObject();
+    auto& box = attributeBoxes[i].AddComponent<Box>();
     box.mWidth = 5.0f;
     box.mHeight = 1.25f;
     box.mFill = 0.0f;
     box.mCenter = boxCenters[i];
-    World::Object boxOwner(&(*spaceIt), attributeBoxes[i]);
-    box.UpdateRepresentation(boxOwner);
-    auto& color = spaceIt->AddComponent<Comp::AlphaColor>(attributeBoxes[i]);
+    box.UpdateRepresentation(attributeBoxes[i]);
+    auto& color = attributeBoxes[i].AddComponent<Comp::AlphaColor>();
     color.mAlphaColor = {0.0f, 1.0f, 0.0f, 1.0f};
-    auto* model = spaceIt->GetComponent<Comp::Model>(attributeBoxes[i]);
+    auto* model = attributeBoxes[i].GetComponent<Comp::Model>();
     model->mShaderId = AssLib::nColorShaderId;
     seq.Gap(0.15f);
     ao.mName = "ShowAttributeBox";
     ao.mDuration = 1.0f;
     ao.mEase = EaseType::QuadOutIn;
     seq.Add(ao, [=](float t) {
-      auto* box = spaceIt->GetComponent<Box>(attributeBoxes[i]);
-      World::Object boxOwner(&(*spaceIt), attributeBoxes[i]);
+      auto* box = attributeBoxes[i].GetComponent<Box>();
       box->mFill = t;
-      box->UpdateRepresentation(boxOwner);
+      box->UpdateRepresentation(attributeBoxes[i]);
     });
   }
   seq.Wait();
 
-  World::MemberId attributeConnectors[3];
+  World::Object attributeConnectors[3];
   Vec3 connectorEnds[3];
   connectorEnds[0] = {-2.5f, 2.0f, -0.1f};
   connectorEnds[1] = {-2.5f, 0.0f, -0.1f};
   connectorEnds[2] = {-2.5f, -2.0f, -0.1f};
   for (int i = 0; i < 3; ++i) {
-    attributeConnectors[i] = spaceIt->CreateMember();
-    auto& line = spaceIt->AddComponent<Line>(attributeConnectors[i]);
+    attributeConnectors[i] = spaceIt->CreateObject();
+    auto& line = attributeConnectors[i].AddComponent<Line>();
     line.mStart = finalVertexSpherePosition;
     line.mEnd = finalVertexSpherePosition;
     line.mThickness = 0.14f;
-    World::Object lineOwner(&(*spaceIt), attributeConnectors[i]);
-    line.UpdateTransform(lineOwner);
-    auto* lineModel =
-      spaceIt->GetComponent<Comp::Model>(attributeConnectors[i]);
+    line.UpdateTransform(attributeConnectors[i]);
+    auto* lineModel = attributeConnectors[i].GetComponent<Comp::Model>();
     lineModel->mShaderId = AssLib::nColorShaderId;
-    auto& colorComp =
-      spaceIt->AddComponent<Comp::AlphaColor>(attributeConnectors[i]);
+    auto& colorComp = attributeConnectors[i].AddComponent<Comp::AlphaColor>();
     colorComp.mAlphaColor = {1.0f, 1.0f, 1.0f, 1.0f};
     seq.Gap(0.1f);
     ao.mName = "ExpandConnector";
     ao.mDuration = 1.0f;
     ao.mEase = EaseType::QuadOutIn;
     seq.Add(ao, [=](float t) {
-      auto* lineComp = spaceIt->GetComponent<Line>(attributeConnectors[i]);
-      World::Object lineOwner(&(*spaceIt), attributeConnectors[i]);
+      auto* lineComp = attributeConnectors[i].GetComponent<Line>();
       lineComp->SetEnd(
         Interpolate<Vec3>(finalVertexSpherePosition, connectorEnds[i], t),
-        lineOwner);
+        attributeConnectors[i]);
     });
   }
   seq.Wait();
 
-  World::MemberId attributeLabel = spaceIt->CreateMember();
+  World::Object attributeLabel = spaceIt->CreateObject();
   {
-    auto& text = spaceIt->AddComponent<Comp::Text>(attributeLabel);
+    auto& text = attributeLabel.AddComponent<Comp::Text>();
     text.mFontId = fugazId;
     text.mFillAmount = 0.0f;
     text.mText = "Attributes";
     text.mAlign = Comp::Text::Alignment::Center;
-    auto* transform = spaceIt->GetComponent<Comp::Transform>(attributeLabel);
+    auto* transform = attributeLabel.GetComponent<Comp::Transform>();
     transform->SetTranslation({6.5f, -0.3f, 0.0f});
     transform->SetUniformScale(0.7f);
-    auto& color = spaceIt->AddComponent<Comp::AlphaColor>(attributeLabel);
+    auto& color = attributeLabel.AddComponent<Comp::AlphaColor>();
     color.mAlphaColor = {1.0f, 1.0f, 1.0f, 1.0f};
   }
   ao.mName = "ShowAttributeLabel";
   ao.mDuration = 1.0f;
   ao.mEase = EaseType::QuadIn;
   seq.Add(ao, [=](float t) {
-    auto* text = spaceIt->GetComponent<Comp::Text>(attributeLabel);
+    auto* text = attributeLabel.GetComponent<Comp::Text>();
     text->mFillAmount = t;
   });
   seq.Wait();
 
-  World::MemberId attributeArrows[3];
+  World::Object attributeArrows[3];
   Vec3 arrowStarts[3];
   Vec3 arrowEnds[3];
   arrowStarts[0] = {4.1f, 0.5f, 0.0f};
@@ -557,41 +545,39 @@ void VertexDescription(Sequence* sequence)
   arrowEnds[1] = {3.2f, 0.0f, 0.0f};
   arrowEnds[2] = {3.2f, -1.5f, 0.0f};
   for (int i = 0; i < 3; ++i) {
-    attributeArrows[i] = spaceIt->CreateMember();
-    auto& arrow = spaceIt->AddComponent<Arrow>(attributeArrows[i]);
+    attributeArrows[i] = spaceIt->CreateObject();
+    auto& arrow = attributeArrows[i].AddComponent<Arrow>();
     arrow.mFill = 0.0f;
     arrow.mStart = arrowStarts[i];
     arrow.mEnd = arrowEnds[i];
-    auto& color = spaceIt->AddComponent<Comp::AlphaColor>(attributeArrows[i]);
+    auto& color = attributeArrows[i].AddComponent<Comp::AlphaColor>();
     color.mAlphaColor = {1.0f, 1.0f, 1.0f, 1.0f};
-    auto* model = spaceIt->GetComponent<Comp::Model>(attributeArrows[i]);
+    auto* model = attributeArrows[i].GetComponent<Comp::Model>();
     model->mShaderId = AssLib::nColorShaderId;
     seq.Gap(0.1f);
     ao.mName = "ShowAttributeArrow";
     ao.mDuration = 1.0f;
     ao.mEase = EaseType::QuadIn;
     seq.Add(ao, [=](float t) {
-      auto* arrow = spaceIt->GetComponent<Arrow>(attributeArrows[i]);
+      auto* arrow = attributeArrows[i].GetComponent<Arrow>();
       arrow->mFill = t;
-      World::Object arrowOwner(&(*spaceIt), attributeArrows[i]);
-      arrow->UpdateRep(arrowOwner);
+      arrow->UpdateRep(attributeArrows[i]);
     });
   }
   seq.Wait();
 
-  World::MemberId attributeFlashes[3];
+  World::Object attributeFlashes[3];
   for (int i = 0; i < 3; ++i) {
-    attributeFlashes[i] = spaceIt->CreateMember();
-    auto& transform =
-      spaceIt->AddComponent<Comp::Transform>(attributeFlashes[i]);
+    attributeFlashes[i] = spaceIt->CreateObject();
+    auto& transform = attributeFlashes[i].AddComponent<Comp::Transform>();
     Vec3 flashCenter = boxCenters[i];
     flashCenter[2] = -1.0f;
     transform.SetTranslation(flashCenter);
     transform.SetScale({4.75f / 2.0f, 1.0f / 2.0f, 0.1f});
-    auto& model = spaceIt->AddComponent<Comp::Model>(attributeFlashes[i]);
+    auto& model = attributeFlashes[i].AddComponent<Comp::Model>();
     model.mModelId = AssLib::nCubeModelId;
     model.mShaderId = AssLib::nColorShaderId;
-    auto& color = spaceIt->AddComponent<Comp::AlphaColor>(attributeFlashes[i]);
+    auto& color = attributeFlashes[i].AddComponent<Comp::AlphaColor>();
     color.mAlphaColor = {1.0f, 1.0f, 1.0f, 0.0f};
     seq.Gap(0.25f);
     ao.mName = "FlashAttribute";
@@ -599,32 +585,31 @@ void VertexDescription(Sequence* sequence)
     ao.mEase = EaseType::QuadOut;
     seq.Add(ao, [=](float t) {
       t = 1.0f - t;
-      auto* color =
-        spaceIt->GetComponent<Comp::AlphaColor>(attributeFlashes[i]);
+      auto* color = attributeFlashes[i].GetComponent<Comp::AlphaColor>();
       color->mAlphaColor[3] = t;
     });
   }
   seq.Wait();
   seq.Gap(1.0f);
 
-  World::MemberId positionLabel = spaceIt->CreateChildMember(attributeBoxes[0]);
+  World::Object positionLabel = spaceIt->CreateChildObject(attributeBoxes[0]);
   {
-    auto& text = spaceIt->AddComponent<Comp::Text>(positionLabel);
+    auto& text = positionLabel.AddComponent<Comp::Text>();
     text.mText = "Position";
     text.mFontId = fugazId;
     text.mFillAmount = 0.0f;
     text.mAlign = Comp::Text::Alignment::Center;
-    auto* transform = spaceIt->GetComponent<Comp::Transform>(positionLabel);
+    auto* transform = positionLabel.GetComponent<Comp::Transform>();
     transform->SetTranslation({0.0f, -0.35f, 0.0f});
     transform->SetUniformScale(0.7f);
-    auto& color = spaceIt->AddComponent<Comp::AlphaColor>(positionLabel);
+    auto& color = positionLabel.AddComponent<Comp::AlphaColor>();
     color.mAlphaColor = {1.0f, 1.0f, 1.0f, 1.0f};
   }
   ao.mName = "ShowPosition";
   ao.mDuration = 0.5f;
   ao.mEase = EaseType::QuadIn;
   seq.Add(ao, [=](float t) {
-    auto* text = spaceIt->GetComponent<Comp::Text>(positionLabel);
+    auto* text = positionLabel.GetComponent<Comp::Text>();
     text->mFillAmount = t;
   });
   seq.Wait();
@@ -634,15 +619,15 @@ void VertexDescription(Sequence* sequence)
   AssLib::Asset<Gfx::Model>& heartAsset = AssLib::GetAsset<Gfx::Model>(heartId);
   heartAsset.mPaths.Push("model/heart.obj");
   heartAsset.FullInit();
-  World::MemberId loveAttributes[2];
+  World::Object loveAttributes[2];
   for (int i = 0; i < 2; ++i) {
-    loveAttributes[i] = spaceIt->CreateMember();
-    auto& model = spaceIt->AddComponent<Comp::Model>(loveAttributes[i]);
+    loveAttributes[i] = spaceIt->CreateObject();
+    auto& model = loveAttributes[i].AddComponent<Comp::Model>();
     model.mModelId = heartId;
     model.mShaderId = AssLib::nColorShaderId;
-    auto& color = spaceIt->AddComponent<Comp::AlphaColor>(loveAttributes[i]);
+    auto& color = loveAttributes[i].AddComponent<Comp::AlphaColor>();
     color.mAlphaColor = {1.0f, 1.0f, 1.0f, 1.0f};
-    auto* transform = spaceIt->GetComponent<Comp::Transform>(loveAttributes[i]);
+    auto* transform = loveAttributes[i].GetComponent<Comp::Transform>();
     Vec3 translation = boxCenters[i + 1];
     translation[2] = 1.0f;
     transform->SetTranslation(translation);
@@ -652,8 +637,7 @@ void VertexDescription(Sequence* sequence)
     ao.mDuration = 0.5f;
     ao.mEase = EaseType::QuadIn;
     seq.Add(ao, [=](float t) {
-      auto* transform =
-        spaceIt->GetComponent<Comp::Transform>(loveAttributes[i]);
+      auto* transform = loveAttributes[i].GetComponent<Comp::Transform>();
       transform->SetUniformScale(t * 0.9f);
     });
   }
@@ -666,25 +650,23 @@ void VertexDescription(Sequence* sequence)
   seq.Add(ao, [=](float t) {
     float newAlpha = 1.0f - t;
     for (int i = 0; i < 2; ++i) {
-      auto* color =
-        spaceIt->GetComponent<Comp::AlphaColor>(attributeConnectors[i + 1]);
+      auto* color = attributeConnectors[i + 1].GetComponent<Comp::AlphaColor>();
       color->mAlphaColor[3] = newAlpha;
-      color = spaceIt->GetComponent<Comp::AlphaColor>(attributeBoxes[i + 1]);
+      color = attributeBoxes[i + 1].GetComponent<Comp::AlphaColor>();
       color->mAlphaColor[3] = newAlpha;
-      color = spaceIt->GetComponent<Comp::AlphaColor>(loveAttributes[i]);
+      color = loveAttributes[i].GetComponent<Comp::AlphaColor>();
       color->mAlphaColor[3] = newAlpha;
     }
     for (int i = 0; i < 3; ++i) {
-      auto* color = spaceIt->GetComponent<Comp::AlphaColor>(attributeArrows[i]);
+      auto* color = attributeArrows[i].GetComponent<Comp::AlphaColor>();
       color->mAlphaColor[3] = newAlpha;
     }
-    auto* color = spaceIt->GetComponent<Comp::AlphaColor>(attributeLabel);
+    auto* color = attributeLabel.GetComponent<Comp::AlphaColor>();
     color->mAlphaColor[3] = newAlpha;
-    color = spaceIt->GetComponent<Comp::AlphaColor>(vertexLabel);
+    color = vertexLabel.GetComponent<Comp::AlphaColor>();
     color->mAlphaColor[3] = newAlpha;
-    auto* bracket = spaceIt->GetComponent<Bracket>(vertexBracket);
-    World::Object bracketOwner(&(*spaceIt), vertexBracket);
-    bracket->ChangeColor(bracketOwner, {1.0f, 1.0f, 1.0f, newAlpha});
+    auto* bracket = vertexBracket.GetComponent<Bracket>();
+    bracket->ChangeColor(vertexBracket, {1.0f, 1.0f, 1.0f, newAlpha});
   });
   seq.Wait();
 
@@ -693,60 +675,55 @@ void VertexDescription(Sequence* sequence)
   seq.Add(ao, [=](float t) {
     for (int i = 0; i < 2; ++i) {
       // I will sooon turn this.
-      auto* line = spaceIt->GetComponent<Line>(attributeConnectors[i + 1]);
-      World::Object lineOwner(&(*spaceIt), attributeConnectors[i + 1]);
-      line->Hide(lineOwner);
+      auto* line = attributeConnectors[i + 1].GetComponent<Line>();
+      line->Hide(attributeConnectors[i + 1]);
       // Into this.
       // attributeConnects[i + 1].Get<Line>.Hide(attributeConnectors[i+1]))
       // Would be cool if I didn't have to pass the object in again.
       // But boom, this would really simplify a lot of code.
-      auto* box = spaceIt->GetComponent<Box>(attributeBoxes[i + 1]);
-      World::Object boxOwner(&(*spaceIt), attributeBoxes[i + 1]);
-      box->Hide(boxOwner);
-      auto* model = spaceIt->GetComponent<Comp::Model>(loveAttributes[i]);
+      auto* box = attributeBoxes[i + 1].GetComponent<Box>();
+      box->Hide(attributeBoxes[i + 1]);
+      auto* model = loveAttributes[i].GetComponent<Comp::Model>();
       model->mVisible = false;
     }
     for (int i = 0; i < 3; ++i) {
-      auto* arrow = spaceIt->GetComponent<Arrow>(attributeArrows[i]);
-      World::Object lineOwner(&(*spaceIt), attributeArrows[i]);
-      arrow->Hide(lineOwner);
+      auto* arrow = attributeArrows[i].GetComponent<Arrow>();
+      arrow->Hide(attributeArrows[i]);
     }
-    auto* text = spaceIt->GetComponent<Comp::Text>(attributeLabel);
+    auto* text = attributeLabel.GetComponent<Comp::Text>();
     text->mVisible = false;
-    text = spaceIt->GetComponent<Comp::Text>(vertexLabel);
+    text = vertexLabel.GetComponent<Comp::Text>();
     text->mVisible = false;
-    auto* bracket = spaceIt->GetComponent<Bracket>(vertexBracket);
-    World::Object bracketOwner(&(*spaceIt), vertexBracket);
-    bracket->Hide(bracketOwner);
+    auto* bracket = vertexBracket.GetComponent<Bracket>();
+    bracket->Hide(vertexBracket);
   });
 
   ao.mName = "MoveVertexAndPosition";
   ao.mDuration = 1.0f;
   ao.mEase = EaseType::QuadOutIn;
   seq.Add(ao, [=](float t) {
-    auto* transform = spaceIt->GetComponent<Comp::Transform>(vertexSphere);
+    auto* transform = vertexSphere.GetComponent<Comp::Transform>();
     Vec3 sphereTranslation =
       Interpolate<Vec3>(finalVertexSpherePosition, {-5.5f, 3.5f, 0.0f}, t);
     transform->SetTranslation(sphereTranslation);
 
-    transform = spaceIt->GetComponent<Comp::Transform>(attributeBoxes[0]);
+    transform = attributeBoxes[0].GetComponent<Comp::Transform>();
     Vec3 boxTranslation =
       Interpolate<Vec3>(boxCenters[0], {0.0f, 3.5f, 0.0f}, t);
     transform->SetTranslation(boxTranslation);
 
-    World::Object lineOwner(&(*spaceIt), attributeConnectors[0]);
-    auto* line = lineOwner.GetComponent<Line>();
+    auto* line = attributeConnectors[0].GetComponent<Line>();
     line->mStart = sphereTranslation;
     line->mEnd = boxTranslation;
     line->mEnd[0] -= 2.5f;
     line->mEnd[2] = -0.1f;
-    line->UpdateTransform(lineOwner);
+    line->UpdateTransform(attributeConnectors[0]);
   });
   seq.Wait();
 
-  World::MemberId positionTable2D = spaceIt->CreateMember();
+  World::Object positionTable2D = spaceIt->CreateObject();
   {
-    auto& table2D = spaceIt->AddComponent<Table>(positionTable2D);
+    auto& table2D = positionTable2D.AddComponent<Table>();
     table2D.mCenter = {1.0f, 1.0f, 0.0f};
     table2D.mCount = 2;
     table2D.mCellWidth = 4.0f;
@@ -756,10 +733,9 @@ void VertexDescription(Sequence* sequence)
   ao.mDuration = 1.0f;
   ao.mEase = EaseType::QuadIn;
   seq.Add(ao, [=](float t) {
-    auto* table2D = spaceIt->GetComponent<Table>(positionTable2D);
+    auto* table2D = positionTable2D.GetComponent<Table>();
     table2D->mFill = t;
-    World::Object tableOwner(&(*spaceIt), positionTable2D);
-    table2D->UpdateRep(tableOwner);
+    table2D->UpdateRep(positionTable2D);
   });
   seq.Wait();
 }
