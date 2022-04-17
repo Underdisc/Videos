@@ -24,12 +24,12 @@ struct Line
     mStart = {0.0f, 0.0f, 0.0f};
     mEnd = {0.0f, 0.0f, 0.0f};
 
-    owner.GetComponent<Comp::Model>().mModelId = AssLib::nCubeModelId;
+    owner.Get<Comp::Model>().mModelId = AssLib::nCubeModelId;
   }
 
   void UpdateTransform(const World::Object& owner)
   {
-    Comp::Transform& transform = owner.GetComponent<Comp::Transform>();
+    Comp::Transform& transform = owner.Get<Comp::Transform>();
     Vec3 direction = mEnd - mStart;
     float directionMag = Math::Magnitude(direction);
     if (Math::Near(directionMag, 0.0f)) {
@@ -58,7 +58,7 @@ struct Line
 
   void Hide(const World::Object& owner)
   {
-    owner.GetComponent<Comp::Model>().mVisible = false;
+    owner.Get<Comp::Model>().mVisible = false;
   }
 };
 
@@ -84,29 +84,25 @@ struct Bracket
     mLeftChild = leftChild.mMemberId;
     mRightChild = rightChild.mMemberId;
 
-    auto& rightModel = rightChild.AddComponent<Comp::Model>();
+    auto& rightModel = rightChild.Add<Comp::Model>();
     rightModel.mModelId = mModelId;
     rightModel.mShaderId = AssLib::nColorShaderId;
-    auto& leftModel = leftChild.AddComponent<Comp::Model>();
+    auto& leftModel = leftChild.Add<Comp::Model>();
     leftModel.mModelId = mModelId;
     leftModel.mShaderId = AssLib::nColorShaderId;
 
     Math::Quaternion leftRotation;
     leftRotation.AngleAxis(Math::nPi, {0.0f, 1.0f, 0.0f});
-    leftChild.GetComponent<Comp::Transform>().SetRotation(leftRotation);
+    leftChild.Get<Comp::Transform>().SetRotation(leftRotation);
 
-    rightChild.AddComponent<Comp::AlphaColor>().mAlphaColor = {
-      1.0f, 1.0f, 1.0f, 1.0f};
-    leftChild.AddComponent<Comp::AlphaColor>().mAlphaColor = {
-      1.0f, 1.0f, 1.0f, 1.0f};
+    rightChild.Add<Comp::AlphaColor>().mAlphaColor = {1.0f, 1.0f, 1.0f, 1.0f};
+    leftChild.Add<Comp::AlphaColor>().mAlphaColor = {1.0f, 1.0f, 1.0f, 1.0f};
   }
 
   void ChangeColor(const World::Object& owner, const Vec4& color)
   {
-    owner.mSpace->GetComponent<Comp::AlphaColor>(mLeftChild).mAlphaColor =
-      color;
-    owner.mSpace->GetComponent<Comp::AlphaColor>(mRightChild).mAlphaColor =
-      color;
+    owner.mSpace->Get<Comp::AlphaColor>(mLeftChild).mAlphaColor = color;
+    owner.mSpace->Get<Comp::AlphaColor>(mRightChild).mAlphaColor = color;
   }
 
   void UpdateRepresentation(const World::Object& owner)
@@ -129,15 +125,15 @@ struct Bracket
     Math::Quaternion extentRotation;
     Vec3 normalExtent = Math::Normalize(mExtent);
     extentRotation.FromTo({1.0f, 0.0f, 0.0f}, normalExtent);
-    auto& transform = owner.GetComponent<Comp::Transform>();
+    auto& transform = owner.Get<Comp::Transform>();
     transform.SetRotation(extentRotation);
     transform.SetTranslation(mCenter);
   }
 
   void Hide(const World::Object& owner)
   {
-    owner.mSpace->GetComponent<Comp::Model>(mLeftChild).mVisible = false;
-    owner.mSpace->GetComponent<Comp::Model>(mRightChild).mVisible = false;
+    owner.mSpace->Get<Comp::Model>(mLeftChild).mVisible = false;
+    owner.mSpace->Get<Comp::Model>(mRightChild).mVisible = false;
   }
 };
 
@@ -154,8 +150,7 @@ struct Box
     mHeight = 2.0f;
     mWidth = 4.0f;
 
-    owner.GetComponent<Comp::Model>().mModelId =
-      AssLib::CreateEmpty<Gfx::Model>("Box");
+    owner.Get<Comp::Model>().mModelId = AssLib::CreateEmpty<Gfx::Model>("Box");
   }
 
   void UpdateRepresentation(const World::Object& owner)
@@ -172,19 +167,19 @@ struct Box
     points.Push({-halfWidth, halfHeight - thickness / 2.0f, 0.0f});
 
     Gfx::InitLineModel(
-      owner.GetComponent<Comp::Model>().mModelId,
+      owner.Get<Comp::Model>().mModelId,
       points,
       mFill,
       thickness,
       Gfx::TerminalType::Flat,
       Gfx::TerminalType::Flat);
 
-    owner.GetComponent<Comp::Transform>().SetTranslation(mCenter);
+    owner.Get<Comp::Transform>().SetTranslation(mCenter);
   }
 
   void Hide(const World::Object& owner)
   {
-    owner.GetComponent<Comp::Model>().mVisible = false;
+    owner.Get<Comp::Model>().mVisible = false;
   }
 };
 
@@ -196,7 +191,7 @@ struct Arrow
 
   void VInit(const World::Object& owner)
   {
-    owner.GetComponent<Comp::Model>().mModelId =
+    owner.Get<Comp::Model>().mModelId =
       AssLib::CreateEmpty<Gfx::Model>("Arrow");
     mStart = {0.0f, 0.0f, 0.0f};
     mEnd = {0.0f, 0.0f, 0.0f};
@@ -210,7 +205,7 @@ struct Arrow
     points.Push(mStart);
     points.Push(mEnd);
     Gfx::InitLineModel(
-      owner.GetComponent<Comp::Model>().mModelId,
+      owner.Get<Comp::Model>().mModelId,
       points,
       mFill,
       0.2f,
@@ -220,7 +215,7 @@ struct Arrow
 
   void Hide(const World::Object& owner)
   {
-    owner.GetComponent<Comp::Model>().mVisible = false;
+    owner.Get<Comp::Model>().mVisible = false;
   }
 };
 
@@ -247,13 +242,13 @@ struct Table
 
   void UpdateRep(const World::Object& owner)
   {
-    owner.GetComponent<Comp::Transform>().SetTranslation(mCenter);
+    owner.Get<Comp::Transform>().SetTranslation(mCenter);
 
     // Make sure the parent has the correct number of children.
     int requiredChildren = 4 + (mCount - 1);
     for (int i = (int)owner.Children().Size(); i < requiredChildren; ++i) {
       World::Object child = owner.CreateChild();
-      child.AddComponent<Line>();
+      child.Add<Line>();
     }
     for (int i = (int)owner.Children().Size() - 1; i >= requiredChildren; ++i) {
       owner.mSpace->DeleteMember(owner.Children()[i]);
@@ -267,7 +262,7 @@ struct Table
     float heightDiff = mCellHeight - mThickness;
     float currentOffset = halfHeight - mThickness / 2.0f;
     for (int i = 0; i < (int)mCount + 1; ++i) {
-      auto& line = owner.mSpace->GetComponent<Line>(owner.Children()[i]);
+      auto& line = owner.mSpace->Get<Line>(owner.Children()[i]);
       line.mStart = {mFill * halfWidth, currentOffset, 0.0f};
       line.mEnd = {-mFill * halfWidth, currentOffset, 0.0f};
       line.mThickness = mThickness;
@@ -281,7 +276,7 @@ struct Table
     currentOffset = halfWidth - mThickness / 2.0f;
     for (int i = 0; i < 2; ++i) {
       int index = (int)mCount + 1 + i;
-      auto& line = owner.mSpace->GetComponent<Line>(owner.Children()[index]);
+      auto& line = owner.mSpace->Get<Line>(owner.Children()[index]);
       line.mStart = {currentOffset, mFill * halfHeight, 0.0f};
       line.mEnd = {currentOffset, -mFill * halfHeight, 0.0f};
       line.mThickness = mThickness;
@@ -294,8 +289,7 @@ struct Table
   void Hide(const World::Object& owner)
   {
     for (int i = 0; i < (int)owner.Children().Size(); ++i) {
-      owner.mSpace->GetComponent<Comp::Model>(owner.Children()[i]).mVisible =
-        false;
+      owner.mSpace->Get<Comp::Model>(owner.Children()[i]).mVisible = false;
     }
   }
 };
@@ -305,10 +299,10 @@ void VertexDescription(Sequence* sequence)
   Sequence& seq = *sequence;
   World::SpaceIt spaceIt = World::CreateTopSpace();
   World::Object camera = spaceIt->CreateObject();
-  Comp::Camera& cameraComp = camera.AddComponent<Comp::Camera>();
+  Comp::Camera& cameraComp = camera.Add<Comp::Camera>();
   cameraComp.mProjectionType = Comp::Camera::ProjectionType::Orthographic;
   cameraComp.mHeight = 10.0f;
-  Comp::Transform& cameraTransform = camera.GetComponent<Comp::Transform>();
+  Comp::Transform& cameraTransform = camera.Get<Comp::Transform>();
   cameraTransform.SetTranslation({0.0f, 0.0f, 10.0f});
   cameraComp.LocalLookAt({0.0f, 0.0f, 0.0f}, {0.0f, 1.0f, 0.0f}, camera);
   spaceIt->mCameraId = camera.mMemberId;
@@ -316,14 +310,13 @@ void VertexDescription(Sequence* sequence)
   World::Object vertexLines[8];
   for (int i = 0; i < 8; ++i) {
     vertexLines[i] = spaceIt->CreateObject();
-    auto& line = vertexLines[i].AddComponent<Line>();
+    auto& line = vertexLines[i].Add<Line>();
     line.mEnd = {0.0f, 0.0f, 0.0f};
     line.mStart = {0.0f, 0.0f, 0.0f};
     line.UpdateTransform(vertexLines[i]);
 
-    vertexLines[i].GetComponent<Comp::Model>().mShaderId =
-      AssLib::nColorShaderId;
-    vertexLines[i].AddComponent<Comp::AlphaColor>().mAlphaColor = {
+    vertexLines[i].Get<Comp::Model>().mShaderId = AssLib::nColorShaderId;
+    vertexLines[i].Add<Comp::AlphaColor>().mAlphaColor = {
       1.0f, 1.0f, 1.0f, 1.0f};
   }
   Sequence::AddOptions ao;
@@ -341,7 +334,7 @@ void VertexDescription(Sequence* sequence)
       Vec3 start = {cosAngle * startDistance, sinAngle * startDistance, 0.0f};
       Vec3 end = {cosAngle * endDistance, sinAngle * endDistance, 0.0f};
 
-      Line& line = vertexLines[i].GetComponent<Line>();
+      Line& line = vertexLines[i].Get<Line>();
       line.SetStart(start, vertexLines[i]);
       line.SetEnd(end, vertexLines[i]);
       angle += angleIncrement;
@@ -363,7 +356,7 @@ void VertexDescription(Sequence* sequence)
       Vec3 start = {cosAngle * startDistance, sinAngle * startDistance, 0.0f};
       Vec3 end = {cosAngle * endDistance, sinAngle * endDistance, 0.0f};
 
-      Line& line = vertexLines[i].GetComponent<Line>();
+      Line& line = vertexLines[i].Get<Line>();
       line.SetStart(start, vertexLines[i]);
       line.SetEnd(end, vertexLines[i]);
       angle += angleIncrement;
@@ -372,21 +365,21 @@ void VertexDescription(Sequence* sequence)
 
   World::Object vertexSphere = spaceIt->CreateObject();
   {
-    vertexSphere.AddComponent<Comp::Model>().mModelId = AssLib::nSphereModelId;
-    vertexSphere.GetComponent<Comp::Transform>().SetUniformScale(0.0f);
+    vertexSphere.Add<Comp::Model>().mModelId = AssLib::nSphereModelId;
+    vertexSphere.Get<Comp::Transform>().SetUniformScale(0.0f);
   }
   ao.mName = "ExpandVertexSphere";
   ao.mDuration = 1.0f;
   ao.mEase = EaseType::QuadIn;
   seq.Add(ao, [=](float t) {
-    vertexSphere.GetComponent<Comp::Transform>().SetUniformScale(t);
+    vertexSphere.Get<Comp::Transform>().SetUniformScale(t);
   });
   seq.Wait();
   seq.Gap(0.5f);
 
   World::Object vertexBracket = spaceIt->CreateChildObject(vertexSphere);
   {
-    auto& bracket = vertexBracket.AddComponent<Bracket>();
+    auto& bracket = vertexBracket.Add<Bracket>();
     bracket.mFill = 0.0f;
     bracket.mCenter = {0.0f, 1.5f, 0.0f};
     bracket.UpdateRepresentation(vertexBracket);
@@ -395,7 +388,7 @@ void VertexDescription(Sequence* sequence)
   ao.mDuration = 0.75;
   ao.mEase = EaseType::QuadIn;
   seq.Add(ao, [=](float t) {
-    auto& bracket = vertexBracket.GetComponent<Bracket>();
+    auto& bracket = vertexBracket.Get<Bracket>();
     bracket.mFill = -t;
     bracket.UpdateRepresentation(vertexBracket);
   });
@@ -408,22 +401,21 @@ void VertexDescription(Sequence* sequence)
 
   World::Object vertexLabel = vertexSphere.CreateChild();
   {
-    auto& text = vertexLabel.AddComponent<Comp::Text>();
+    auto& text = vertexLabel.Add<Comp::Text>();
     text.mAlign = Comp::Text::Alignment::Center;
     text.mFillAmount = 0.0f;
     text.mText = "Vertex";
     text.mFontId = fugazId;
-    auto& transform = vertexLabel.GetComponent<Comp::Transform>();
+    auto& transform = vertexLabel.Get<Comp::Transform>();
     transform.SetTranslation({0.0f, 2.0f, 0.0f});
     transform.SetUniformScale(0.7f);
-    vertexLabel.AddComponent<Comp::AlphaColor>().mAlphaColor = {
-      1.0f, 1.0f, 1.0f, 1.0f};
+    vertexLabel.Add<Comp::AlphaColor>().mAlphaColor = {1.0f, 1.0f, 1.0f, 1.0f};
   }
   ao.mName = "ShowVertexLabel";
   ao.mDuration = 0.5f;
   ao.mEase = EaseType::QuadIn;
   seq.Add(ao, [=](float t) {
-    vertexLabel.GetComponent<Comp::Text>().mFillAmount = t;
+    vertexLabel.Get<Comp::Text>().mFillAmount = t;
   });
   seq.Wait();
   seq.Gap(0.5f);
@@ -433,7 +425,7 @@ void VertexDescription(Sequence* sequence)
   ao.mDuration = 1.0f;
   ao.mEase = EaseType::QuadOutIn;
   seq.Add(ao, [=](float t) {
-    vertexSphere.GetComponent<Comp::Transform>().SetTranslation(
+    vertexSphere.Get<Comp::Transform>().SetTranslation(
       Interpolate<Vec3>({0.0f, 0.0f, 0.0f}, finalVertexSpherePosition, t));
   });
   seq.Wait();
@@ -445,22 +437,21 @@ void VertexDescription(Sequence* sequence)
   boxCenters[2] = {0.0f, -2.0f, 0.0f};
   for (int i = 0; i < 3; ++i) {
     attributeBoxes[i] = spaceIt->CreateObject();
-    auto& box = attributeBoxes[i].AddComponent<Box>();
+    auto& box = attributeBoxes[i].Add<Box>();
     box.mWidth = 5.0f;
     box.mHeight = 1.25f;
     box.mFill = 0.0f;
     box.mCenter = boxCenters[i];
     box.UpdateRepresentation(attributeBoxes[i]);
-    attributeBoxes[i].AddComponent<Comp::AlphaColor>().mAlphaColor = {
+    attributeBoxes[i].Add<Comp::AlphaColor>().mAlphaColor = {
       0.0f, 1.0f, 0.0f, 1.0f};
-    attributeBoxes[i].GetComponent<Comp::Model>().mShaderId =
-      AssLib::nColorShaderId;
+    attributeBoxes[i].Get<Comp::Model>().mShaderId = AssLib::nColorShaderId;
     seq.Gap(0.15f);
     ao.mName = "ShowAttributeBox";
     ao.mDuration = 1.0f;
     ao.mEase = EaseType::QuadOutIn;
     seq.Add(ao, [=](float t) {
-      auto& box = attributeBoxes[i].GetComponent<Box>();
+      auto& box = attributeBoxes[i].Get<Box>();
       box.mFill = t;
       box.UpdateRepresentation(attributeBoxes[i]);
     });
@@ -474,21 +465,21 @@ void VertexDescription(Sequence* sequence)
   connectorEnds[2] = {-2.5f, -2.0f, -0.1f};
   for (int i = 0; i < 3; ++i) {
     attributeConnectors[i] = spaceIt->CreateObject();
-    auto& line = attributeConnectors[i].AddComponent<Line>();
+    auto& line = attributeConnectors[i].Add<Line>();
     line.mStart = finalVertexSpherePosition;
     line.mEnd = finalVertexSpherePosition;
     line.mThickness = 0.14f;
     line.UpdateTransform(attributeConnectors[i]);
-    attributeConnectors[i].GetComponent<Comp::Model>().mShaderId =
+    attributeConnectors[i].Get<Comp::Model>().mShaderId =
       AssLib::nColorShaderId;
-    attributeConnectors[i].AddComponent<Comp::AlphaColor>().mAlphaColor = {
+    attributeConnectors[i].Add<Comp::AlphaColor>().mAlphaColor = {
       1.0f, 1.0f, 1.0f, 1.0f};
     seq.Gap(0.1f);
     ao.mName = "ExpandConnector";
     ao.mDuration = 1.0f;
     ao.mEase = EaseType::QuadOutIn;
     seq.Add(ao, [=](float t) {
-      attributeConnectors[i].GetComponent<Line>().SetEnd(
+      attributeConnectors[i].Get<Line>().SetEnd(
         Interpolate<Vec3>(finalVertexSpherePosition, connectorEnds[i], t),
         attributeConnectors[i]);
     });
@@ -497,22 +488,22 @@ void VertexDescription(Sequence* sequence)
 
   World::Object attributeLabel = spaceIt->CreateObject();
   {
-    auto& text = attributeLabel.AddComponent<Comp::Text>();
+    auto& text = attributeLabel.Add<Comp::Text>();
     text.mFontId = fugazId;
     text.mFillAmount = 0.0f;
     text.mText = "Attributes";
     text.mAlign = Comp::Text::Alignment::Center;
-    auto& transform = attributeLabel.GetComponent<Comp::Transform>();
+    auto& transform = attributeLabel.Get<Comp::Transform>();
     transform.SetTranslation({6.5f, -0.3f, 0.0f});
     transform.SetUniformScale(0.7f);
-    attributeLabel.AddComponent<Comp::AlphaColor>().mAlphaColor = {
+    attributeLabel.Add<Comp::AlphaColor>().mAlphaColor = {
       1.0f, 1.0f, 1.0f, 1.0f};
   }
   ao.mName = "ShowAttributeLabel";
   ao.mDuration = 1.0f;
   ao.mEase = EaseType::QuadIn;
   seq.Add(ao, [=](float t) {
-    attributeLabel.GetComponent<Comp::Text>().mFillAmount = t;
+    attributeLabel.Get<Comp::Text>().mFillAmount = t;
   });
   seq.Wait();
 
@@ -527,20 +518,19 @@ void VertexDescription(Sequence* sequence)
   arrowEnds[2] = {3.2f, -1.5f, 0.0f};
   for (int i = 0; i < 3; ++i) {
     attributeArrows[i] = spaceIt->CreateObject();
-    auto& arrow = attributeArrows[i].AddComponent<Arrow>();
+    auto& arrow = attributeArrows[i].Add<Arrow>();
     arrow.mFill = 0.0f;
     arrow.mStart = arrowStarts[i];
     arrow.mEnd = arrowEnds[i];
-    attributeArrows[i].AddComponent<Comp::AlphaColor>().mAlphaColor = {
+    attributeArrows[i].Add<Comp::AlphaColor>().mAlphaColor = {
       1.0f, 1.0f, 1.0f, 1.0f};
-    attributeArrows[i].GetComponent<Comp::Model>().mShaderId =
-      AssLib::nColorShaderId;
+    attributeArrows[i].Get<Comp::Model>().mShaderId = AssLib::nColorShaderId;
     seq.Gap(0.1f);
     ao.mName = "ShowAttributeArrow";
     ao.mDuration = 1.0f;
     ao.mEase = EaseType::QuadIn;
     seq.Add(ao, [=](float t) {
-      auto& arrow = attributeArrows[i].GetComponent<Arrow>();
+      auto& arrow = attributeArrows[i].Get<Arrow>();
       arrow.mFill = t;
       arrow.UpdateRep(attributeArrows[i]);
     });
@@ -552,13 +542,13 @@ void VertexDescription(Sequence* sequence)
     attributeFlashes[i] = spaceIt->CreateObject();
     Vec3 flashCenter = boxCenters[i];
     flashCenter[2] = -1.0f;
-    auto& transform = attributeFlashes[i].AddComponent<Comp::Transform>();
+    auto& transform = attributeFlashes[i].Add<Comp::Transform>();
     transform.SetTranslation(flashCenter);
     transform.SetScale({4.75f / 2.0f, 1.0f / 2.0f, 0.1f});
-    auto& model = attributeFlashes[i].AddComponent<Comp::Model>();
+    auto& model = attributeFlashes[i].Add<Comp::Model>();
     model.mModelId = AssLib::nCubeModelId;
     model.mShaderId = AssLib::nColorShaderId;
-    attributeFlashes[i].AddComponent<Comp::AlphaColor>().mAlphaColor = {
+    attributeFlashes[i].Add<Comp::AlphaColor>().mAlphaColor = {
       1.0f, 1.0f, 1.0f, 0.0f};
     seq.Gap(0.25f);
     ao.mName = "FlashAttribute";
@@ -566,7 +556,7 @@ void VertexDescription(Sequence* sequence)
     ao.mEase = EaseType::QuadOut;
     seq.Add(ao, [=](float t) {
       t = 1.0f - t;
-      attributeFlashes[i].GetComponent<Comp::AlphaColor>().mAlphaColor[3] = t;
+      attributeFlashes[i].Get<Comp::AlphaColor>().mAlphaColor[3] = t;
     });
   }
   seq.Wait();
@@ -574,22 +564,22 @@ void VertexDescription(Sequence* sequence)
 
   World::Object positionLabel = spaceIt->CreateChildObject(attributeBoxes[0]);
   {
-    auto& text = positionLabel.AddComponent<Comp::Text>();
+    auto& text = positionLabel.Add<Comp::Text>();
     text.mText = "Position";
     text.mFontId = fugazId;
     text.mFillAmount = 0.0f;
     text.mAlign = Comp::Text::Alignment::Center;
-    auto& transform = positionLabel.GetComponent<Comp::Transform>();
+    auto& transform = positionLabel.Get<Comp::Transform>();
     transform.SetTranslation({0.0f, -0.35f, 0.0f});
     transform.SetUniformScale(0.7f);
-    positionLabel.AddComponent<Comp::AlphaColor>().mAlphaColor = {
+    positionLabel.Add<Comp::AlphaColor>().mAlphaColor = {
       1.0f, 1.0f, 1.0f, 1.0f};
   }
   ao.mName = "ShowPosition";
   ao.mDuration = 0.5f;
   ao.mEase = EaseType::QuadIn;
   seq.Add(ao, [=](float t) {
-    positionLabel.GetComponent<Comp::Text>().mFillAmount = t;
+    positionLabel.Get<Comp::Text>().mFillAmount = t;
   });
   seq.Wait();
   seq.Gap(1.0f);
@@ -602,14 +592,14 @@ void VertexDescription(Sequence* sequence)
   World::Object loveAttributes[2];
   for (int i = 0; i < 2; ++i) {
     loveAttributes[i] = spaceIt->CreateObject();
-    auto& model = loveAttributes[i].AddComponent<Comp::Model>();
+    auto& model = loveAttributes[i].Add<Comp::Model>();
     model.mModelId = heartId;
     model.mShaderId = AssLib::nColorShaderId;
-    loveAttributes[i].AddComponent<Comp::AlphaColor>().mAlphaColor = {
+    loveAttributes[i].Add<Comp::AlphaColor>().mAlphaColor = {
       1.0f, 1.0f, 1.0f, 1.0f};
     Vec3 translation = boxCenters[i + 1];
     translation[2] = 1.0f;
-    auto& transform = loveAttributes[i].GetComponent<Comp::Transform>();
+    auto& transform = loveAttributes[i].Get<Comp::Transform>();
     transform.SetTranslation(translation);
     transform.SetUniformScale(0.0f);
     seq.Gap(0.25f);
@@ -617,8 +607,7 @@ void VertexDescription(Sequence* sequence)
     ao.mDuration = 0.5f;
     ao.mEase = EaseType::QuadIn;
     seq.Add(ao, [=](float t) {
-      loveAttributes[i].GetComponent<Comp::Transform>().SetUniformScale(
-        t * 0.9f);
+      loveAttributes[i].Get<Comp::Transform>().SetUniformScale(t * 0.9f);
     });
   }
   seq.Wait();
@@ -630,21 +619,17 @@ void VertexDescription(Sequence* sequence)
   seq.Add(ao, [=](float t) {
     float newAlpha = 1.0f - t;
     for (int i = 0; i < 2; ++i) {
-      attributeConnectors[i + 1]
-        .GetComponent<Comp::AlphaColor>()
-        .mAlphaColor[3] = newAlpha;
-      attributeBoxes[i + 1].GetComponent<Comp::AlphaColor>().mAlphaColor[3] =
+      attributeConnectors[i + 1].Get<Comp::AlphaColor>().mAlphaColor[3] =
         newAlpha;
-      loveAttributes[i].GetComponent<Comp::AlphaColor>().mAlphaColor[3] =
-        newAlpha;
+      attributeBoxes[i + 1].Get<Comp::AlphaColor>().mAlphaColor[3] = newAlpha;
+      loveAttributes[i].Get<Comp::AlphaColor>().mAlphaColor[3] = newAlpha;
     }
     for (int i = 0; i < 3; ++i) {
-      attributeArrows[i].GetComponent<Comp::AlphaColor>().mAlphaColor[3] =
-        newAlpha;
+      attributeArrows[i].Get<Comp::AlphaColor>().mAlphaColor[3] = newAlpha;
     }
-    attributeLabel.GetComponent<Comp::AlphaColor>().mAlphaColor[3] = newAlpha;
-    vertexLabel.GetComponent<Comp::AlphaColor>().mAlphaColor[3] = newAlpha;
-    vertexBracket.GetComponent<Bracket>().ChangeColor(
+    attributeLabel.Get<Comp::AlphaColor>().mAlphaColor[3] = newAlpha;
+    vertexLabel.Get<Comp::AlphaColor>().mAlphaColor[3] = newAlpha;
+    vertexBracket.Get<Bracket>().ChangeColor(
       vertexBracket, {1.0f, 1.0f, 1.0f, newAlpha});
   });
   seq.Wait();
@@ -653,22 +638,16 @@ void VertexDescription(Sequence* sequence)
   ao.mDuration = 0.0f;
   seq.Add(ao, [=](float t) {
     for (int i = 0; i < 2; ++i) {
-      // I will sooon turn this.
-      attributeConnectors[i + 1].GetComponent<Line>().Hide(
-        attributeConnectors[i + 1]);
-      // Into this.
-      // attributeConnects[i + 1].Get<Line>.Hide(attributeConnectors[i+1]))
-      // Would be cool if I didn't have to pass the object in again.
-      // But boom, this would really simplify a lot of code.
-      attributeBoxes[i + 1].GetComponent<Box>().Hide(attributeBoxes[i + 1]);
-      loveAttributes[i].GetComponent<Comp::Model>().mVisible = false;
+      attributeConnectors[i + 1].Get<Line>().Hide(attributeConnectors[i + 1]);
+      attributeBoxes[i + 1].Get<Box>().Hide(attributeBoxes[i + 1]);
+      loveAttributes[i].Get<Comp::Model>().mVisible = false;
     }
     for (int i = 0; i < 3; ++i) {
-      attributeArrows[i].GetComponent<Arrow>().Hide(attributeArrows[i]);
+      attributeArrows[i].Get<Arrow>().Hide(attributeArrows[i]);
     }
-    attributeLabel.GetComponent<Comp::Text>().mVisible = false;
-    vertexLabel.GetComponent<Comp::Text>().mVisible = false;
-    vertexBracket.GetComponent<Bracket>().Hide(vertexBracket);
+    attributeLabel.Get<Comp::Text>().mVisible = false;
+    vertexLabel.Get<Comp::Text>().mVisible = false;
+    vertexBracket.Get<Bracket>().Hide(vertexBracket);
   });
 
   ao.mName = "MoveVertexAndPosition";
@@ -677,12 +656,10 @@ void VertexDescription(Sequence* sequence)
   seq.Add(ao, [=](float t) {
     Vec3 sphereTranslation =
       Interpolate(finalVertexSpherePosition, {-5.5f, 3.5f, 0.0f}, t);
-    vertexSphere.GetComponent<Comp::Transform>().SetTranslation(
-      sphereTranslation);
+    vertexSphere.Get<Comp::Transform>().SetTranslation(sphereTranslation);
     Vec3 boxTranslation = Interpolate(boxCenters[0], {0.0f, 3.5f, 0.0f}, t);
-    attributeBoxes[0].GetComponent<Comp::Transform>().SetTranslation(
-      boxTranslation);
-    auto& line = attributeConnectors[0].GetComponent<Line>();
+    attributeBoxes[0].Get<Comp::Transform>().SetTranslation(boxTranslation);
+    auto& line = attributeConnectors[0].Get<Line>();
     line.mStart = sphereTranslation;
     line.mEnd = boxTranslation;
     line.mEnd[0] -= 2.5f;
@@ -693,7 +670,7 @@ void VertexDescription(Sequence* sequence)
 
   World::Object positionTable2D = spaceIt->CreateObject();
   {
-    auto& table2D = positionTable2D.AddComponent<Table>();
+    auto& table2D = positionTable2D.Add<Table>();
     table2D.mCenter = {1.0f, 1.0f, 0.0f};
     table2D.mCount = 2;
     table2D.mCellWidth = 4.0f;
@@ -703,7 +680,7 @@ void VertexDescription(Sequence* sequence)
   ao.mDuration = 1.0f;
   ao.mEase = EaseType::QuadIn;
   seq.Add(ao, [=](float t) {
-    auto& table2D = positionTable2D.GetComponent<Table>();
+    auto& table2D = positionTable2D.Get<Table>();
     table2D.mFill = t;
     table2D.UpdateRep(positionTable2D);
   });
