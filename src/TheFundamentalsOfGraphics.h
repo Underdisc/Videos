@@ -76,7 +76,6 @@ struct Bracket
   {
     mCenter = {0.0f, 0.0f, 0.0f};
     mExtent = {1.0f, 0.0f, 0.0f};
-    mFill = 0.0f;
     mModelId = AssLib::CreateEmpty<Gfx::Model>("Bracket");
 
     World::Object leftChild = owner.CreateChild();
@@ -97,6 +96,8 @@ struct Bracket
 
     rightChild.Add<Comp::AlphaColor>().mAlphaColor = {1.0f, 1.0f, 1.0f, 1.0f};
     leftChild.Add<Comp::AlphaColor>().mAlphaColor = {1.0f, 1.0f, 1.0f, 1.0f};
+
+    Fill(owner, 0.0f);
   }
 
   void ChangeColor(const World::Object& owner, const Vec4& color)
@@ -105,7 +106,7 @@ struct Bracket
     owner.mSpace->Get<Comp::AlphaColor>(mRightChild).mAlphaColor = color;
   }
 
-  void UpdateRepresentation(const World::Object& owner)
+  void Fill(const World::Object& owner, float fill)
   {
     Ds::Vector<Vec3> points;
     points.Push({0.0f, 0.3f, 0.0f});
@@ -117,7 +118,7 @@ struct Bracket
     Gfx::InitLineModel(
       mModelId,
       points,
-      mFill,
+      fill,
       0.25f,
       Gfx::TerminalType::CollapsedNormal,
       Gfx::TerminalType::CollapsedNormal);
@@ -142,18 +143,17 @@ struct Box
   Vec3 mCenter;
   float mWidth;
   float mHeight;
-  float mFill;
 
   void VInit(const World::Object& owner)
   {
     mCenter = {0.0f, 0.0f, 0.0f};
     mHeight = 2.0f;
     mWidth = 4.0f;
-
     owner.Get<Comp::Model>().mModelId = AssLib::CreateEmpty<Gfx::Model>("Box");
+    Fill(owner, 0.0f);
   }
 
-  void UpdateRepresentation(const World::Object& owner)
+  void Fill(const World::Object& owner, float fill)
   {
     float halfHeight = mHeight / 2.0f;
     float halfWidth = mWidth / 2.0f;
@@ -169,7 +169,7 @@ struct Box
     Gfx::InitLineModel(
       owner.Get<Comp::Model>().mModelId,
       points,
-      mFill,
+      fill,
       thickness,
       Gfx::TerminalType::Flat,
       Gfx::TerminalType::Flat);
@@ -187,7 +187,6 @@ struct Arrow
 {
   Vec3 mStart;
   Vec3 mEnd;
-  float mFill;
 
   void VInit(const World::Object& owner)
   {
@@ -195,11 +194,10 @@ struct Arrow
       AssLib::CreateEmpty<Gfx::Model>("Arrow");
     mStart = {0.0f, 0.0f, 0.0f};
     mEnd = {0.0f, 0.0f, 0.0f};
-    mFill = 0.0f;
-    UpdateRep(owner);
+    Fill(owner, 0.0f);
   }
 
-  void UpdateRep(const World::Object& owner)
+  void Fill(const World::Object& owner, float fill)
   {
     Ds::Vector<Vec3> points;
     points.Push(mStart);
@@ -207,7 +205,7 @@ struct Arrow
     Gfx::InitLineModel(
       owner.Get<Comp::Model>().mModelId,
       points,
-      mFill,
+      fill,
       0.2f,
       Gfx::TerminalType::CollapsedBinormal,
       Gfx::TerminalType::Arrow);
@@ -234,13 +232,11 @@ struct Table
     mCellWidth = 2.0f;
     mCellHeight = 1.0f;
     mCount = 1;
-    mFill = 0.0f;
     mThickness = 0.2f;
-
-    UpdateRep(owner);
+    Fill(owner, 0.0f);
   }
 
-  void UpdateRep(const World::Object& owner)
+  void Fill(const World::Object& owner, float fill)
   {
     owner.Get<Comp::Transform>().SetTranslation(mCenter);
 
@@ -263,8 +259,8 @@ struct Table
     float currentOffset = halfHeight - mThickness / 2.0f;
     for (int i = 0; i < (int)mCount + 1; ++i) {
       auto& line = owner.mSpace->Get<Line>(owner.Children()[i]);
-      line.mStart = {mFill * halfWidth, currentOffset, 0.0f};
-      line.mEnd = {-mFill * halfWidth, currentOffset, 0.0f};
+      line.mStart = {fill * halfWidth, currentOffset, 0.0f};
+      line.mEnd = {-fill * halfWidth, currentOffset, 0.0f};
       line.mThickness = mThickness;
       World::Object childOwner(owner.mSpace, owner.Children()[i]);
       line.UpdateTransform(childOwner);
@@ -277,8 +273,8 @@ struct Table
     for (int i = 0; i < 2; ++i) {
       int index = (int)mCount + 1 + i;
       auto& line = owner.mSpace->Get<Line>(owner.Children()[index]);
-      line.mStart = {currentOffset, mFill * halfHeight, 0.0f};
-      line.mEnd = {currentOffset, -mFill * halfHeight, 0.0f};
+      line.mStart = {currentOffset, fill * halfHeight, 0.0f};
+      line.mEnd = {currentOffset, -fill * halfHeight, 0.0f};
       line.mThickness = mThickness;
       World::Object childOwner(owner.mSpace, owner.Children()[index]);
       line.UpdateTransform(childOwner);
@@ -379,18 +375,13 @@ void VertexDescription(Sequence* sequence)
 
   World::Object vertexBracket = spaceIt->CreateChildObject(vertexSphere);
   {
-    auto& bracket = vertexBracket.Add<Bracket>();
-    bracket.mFill = 0.0f;
-    bracket.mCenter = {0.0f, 1.5f, 0.0f};
-    bracket.UpdateRepresentation(vertexBracket);
+    auto& bracket = vertexBracket.Add<Bracket>().mCenter = {0.0f, 1.5f, 0.0f};
   }
   ao.mName = "ExpandVertexBracket";
   ao.mDuration = 0.75;
   ao.mEase = EaseType::QuadIn;
   seq.Add(ao, [=](float t) {
-    auto& bracket = vertexBracket.Get<Bracket>();
-    bracket.mFill = -t;
-    bracket.UpdateRepresentation(vertexBracket);
+    vertexBracket.Get<Bracket>().Fill(vertexBracket, -t);
   });
   seq.Wait();
 
@@ -440,20 +431,17 @@ void VertexDescription(Sequence* sequence)
     auto& box = attributeBoxes[i].Add<Box>();
     box.mWidth = 5.0f;
     box.mHeight = 1.25f;
-    box.mFill = 0.0f;
     box.mCenter = boxCenters[i];
-    box.UpdateRepresentation(attributeBoxes[i]);
     attributeBoxes[i].Add<Comp::AlphaColor>().mAlphaColor = {
       0.0f, 1.0f, 0.0f, 1.0f};
     attributeBoxes[i].Get<Comp::Model>().mShaderId = AssLib::nColorShaderId;
+
     seq.Gap(0.15f);
     ao.mName = "ShowAttributeBox";
     ao.mDuration = 1.0f;
     ao.mEase = EaseType::QuadOutIn;
     seq.Add(ao, [=](float t) {
-      auto& box = attributeBoxes[i].Get<Box>();
-      box.mFill = t;
-      box.UpdateRepresentation(attributeBoxes[i]);
+      attributeBoxes[i].Get<Box>().Fill(attributeBoxes[i], t);
     });
   }
   seq.Wait();
@@ -519,20 +507,18 @@ void VertexDescription(Sequence* sequence)
   for (int i = 0; i < 3; ++i) {
     attributeArrows[i] = spaceIt->CreateObject();
     auto& arrow = attributeArrows[i].Add<Arrow>();
-    arrow.mFill = 0.0f;
     arrow.mStart = arrowStarts[i];
     arrow.mEnd = arrowEnds[i];
     attributeArrows[i].Add<Comp::AlphaColor>().mAlphaColor = {
       1.0f, 1.0f, 1.0f, 1.0f};
     attributeArrows[i].Get<Comp::Model>().mShaderId = AssLib::nColorShaderId;
+
     seq.Gap(0.1f);
     ao.mName = "ShowAttributeArrow";
     ao.mDuration = 1.0f;
     ao.mEase = EaseType::QuadIn;
     seq.Add(ao, [=](float t) {
-      auto& arrow = attributeArrows[i].Get<Arrow>();
-      arrow.mFill = t;
-      arrow.UpdateRep(attributeArrows[i]);
+      attributeArrows[i].Get<Arrow>().Fill(attributeArrows[i], t);
     });
   }
   seq.Wait();
@@ -680,9 +666,7 @@ void VertexDescription(Sequence* sequence)
   ao.mDuration = 1.0f;
   ao.mEase = EaseType::QuadIn;
   seq.Add(ao, [=](float t) {
-    auto& table2D = positionTable2D.Get<Table>();
-    table2D.mFill = t;
-    table2D.UpdateRep(positionTable2D);
+    positionTable2D.Get<Table>().Fill(positionTable2D, t);
   });
   seq.Wait();
 }
