@@ -56,9 +56,9 @@ struct Line
     UpdateTransform(owner);
   }
 
-  void Hide(const World::Object& owner)
+  void Show(const World::Object& owner, bool visible)
   {
-    owner.Get<Comp::Model>().mVisible = false;
+    owner.Get<Comp::Model>().mVisible = visible;
   }
 };
 
@@ -131,10 +131,10 @@ struct Bracket
     transform.SetTranslation(mCenter);
   }
 
-  void Hide(const World::Object& owner)
+  void Show(const World::Object& owner, bool visible)
   {
-    owner.mSpace->Get<Comp::Model>(mLeftChild).mVisible = false;
-    owner.mSpace->Get<Comp::Model>(mRightChild).mVisible = false;
+    owner.mSpace->Get<Comp::Model>(mLeftChild).mVisible = visible;
+    owner.mSpace->Get<Comp::Model>(mRightChild).mVisible = visible;
   }
 };
 
@@ -177,9 +177,9 @@ struct Box
     owner.Get<Comp::Transform>().SetTranslation(mCenter);
   }
 
-  void Hide(const World::Object& owner)
+  void Show(const World::Object& owner, bool visible)
   {
-    owner.Get<Comp::Model>().mVisible = false;
+    owner.Get<Comp::Model>().mVisible = visible;
   }
 };
 
@@ -211,9 +211,9 @@ struct Arrow
       Gfx::TerminalType::Arrow);
   }
 
-  void Hide(const World::Object& owner)
+  void Show(const World::Object& owner, bool visible)
   {
-    owner.Get<Comp::Model>().mVisible = false;
+    owner.Get<Comp::Model>().mVisible = visible;
   }
 };
 
@@ -282,10 +282,10 @@ struct Table
     }
   }
 
-  void Hide(const World::Object& owner)
+  void Show(const World::Object& owner, bool visible)
   {
     for (int i = 0; i < (int)owner.Children().Size(); ++i) {
-      owner.mSpace->Get<Comp::Model>(owner.Children()[i]).mVisible = false;
+      owner.mSpace->Get<Comp::Model>(owner.Children()[i]).mVisible = visible;
     }
   }
 };
@@ -539,9 +539,8 @@ void VertexDescription(Sequence* sequence)
     seq.Gap(0.25f);
     ao.mName = "FlashAttribute";
     ao.mDuration = 1.5f;
-    ao.mEase = EaseType::QuadOut;
+    ao.mEase = EaseType::Flash;
     seq.Add(ao, [=](float t) {
-      t = 1.0f - t;
       attributeFlashes[i].Get<Comp::AlphaColor>().mAlphaColor[3] = t;
     });
   }
@@ -623,17 +622,19 @@ void VertexDescription(Sequence* sequence)
   ao.mName = "HideFadedElements";
   ao.mDuration = 0.0f;
   seq.Add(ao, [=](float t) {
+    bool visible = !(bool)(int)t;
     for (int i = 0; i < 2; ++i) {
-      attributeConnectors[i + 1].Get<Line>().Hide(attributeConnectors[i + 1]);
-      attributeBoxes[i + 1].Get<Box>().Hide(attributeBoxes[i + 1]);
-      loveAttributes[i].Get<Comp::Model>().mVisible = false;
+      attributeConnectors[i + 1].Get<Line>().Show(
+        attributeConnectors[i + 1], visible);
+      attributeBoxes[i + 1].Get<Box>().Show(attributeBoxes[i + 1], visible);
+      loveAttributes[i].Get<Comp::Model>().mVisible = visible;
     }
     for (int i = 0; i < 3; ++i) {
-      attributeArrows[i].Get<Arrow>().Hide(attributeArrows[i]);
+      attributeArrows[i].Get<Arrow>().Show(attributeArrows[i], visible);
     }
-    attributeLabel.Get<Comp::Text>().mVisible = false;
-    vertexLabel.Get<Comp::Text>().mVisible = false;
-    vertexBracket.Get<Bracket>().Hide(vertexBracket);
+    attributeLabel.Get<Comp::Text>().mVisible = visible;
+    vertexLabel.Get<Comp::Text>().mVisible = visible;
+    vertexBracket.Get<Bracket>().Show(vertexBracket, visible);
   });
 
   ao.mName = "MoveVertexAndPosition";

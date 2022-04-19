@@ -19,6 +19,7 @@ enum class EaseType
   QuadOutIn,
   Cubic,
   FlattenedCubic,
+  Flash,
 };
 float Ease(float t, EaseType easeType);
 
@@ -27,27 +28,18 @@ struct Sequence
   Sequence();
   enum class Status
   {
-    Start,
-    Perform,
-    End,
+    Play,
     Pause
   };
 
   struct Event
   {
     std::string mName;
-    // Duration since the previous event before this event begins.
-    float mTimeUntil;
-    float mDuration;
+    float mStartTime;
+    float mEndTime;
     EaseType mEase;
     std::function<void(float t)> mFunction;
     void Run(float t) const;
-  };
-
-  struct ActiveEvent
-  {
-    unsigned int mEventIndex;
-    float mTimeAfter;
   };
 
   struct AddOptions
@@ -60,16 +52,22 @@ struct Sequence
   void Gap(float duration);
   void Wait();
 
-  void Continue();
+  void Play();
   void Pause();
+  bool AtEnd();
   void Update(float dt);
+  void Scrub(float time);
+  void ScrubUp(float time);
+  void ScrubDown(float time);
 
-  // Duration since the start of the last event activated event.
-  float mTimeAfter;
+  // The number of seconds that have passed since the start of the sequence.
+  float mTimePassed;
+  // The total duration of the sequence.
+  float mTotalTime;
   Status mStatus;
   unsigned int mNextInactiveEvent;
   Ds::Vector<Event> mEvents;
-  Ds::Vector<ActiveEvent> mActiveEvents;
+  Ds::Vector<unsigned int> mActiveEvents;
 };
 
 #endif

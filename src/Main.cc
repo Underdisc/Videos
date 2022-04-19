@@ -406,9 +406,23 @@ Sequence gSequence;
 void CentralUpdate()
 {
   if (Input::KeyPressed(Input::Key::Space)) {
-    gSequence.Continue();
+    if (gSequence.mStatus == Sequence::Status::Play) {
+      gSequence.Pause();
+    } else {
+      gSequence.Play();
+    }
   }
   gSequence.Update(Temporal::DeltaTime());
+
+  ImGui::Begin("Sequence");
+  float time = gSequence.mTimePassed;
+  ImGui::PushItemWidth(-1.0f);
+  ImGui::SliderFloat("Time", &time, 0.0f, gSequence.mTotalTime);
+  if (time != gSequence.mTimePassed) {
+    gSequence.Pause();
+    gSequence.Scrub(time);
+  }
+  ImGui::End();
 }
 
 void RegisterTypes()
