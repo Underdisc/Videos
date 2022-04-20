@@ -33,13 +33,25 @@ Computing in general only began to take off in the 1940s. It would take another 
 Body
   Vertices
     
-Our first focus is the most fundamental of all fundamentals, the vertex. 
-In the most general sense, a vertex is just a group of unique types of data. These different types are typically referred to as vertex attributes.
-It's the data contained in these attributes that will have the largest impact on a rendered image.
-One of them is position. We'll ignore the others, because, though loved, they unfortunately aren't nearly as imporant.
-Whether we're doing 2D or 3D rendering determines how much data is contained in the position attribute, but we'll be doing everything in 3D here.
-With that specified, the position attribute contains 3 values, an x, y, and z coordinate.
+Our first focus is the most fundamental element of all, the vertex. 
+In the most general sense, a vertex is just a grouping of unique types of data.
+These different types are referred to as attributes.
+They determine the "what" of rendering and they can take many forms.
+The most common attributes are position, normal, and uv.
+It's important to note that attributes can really be whatever we desire, but these are the most common ways that we interpret attribute data.
+Though loved by many a graphics programmer, the normal and uv attributes aren't nearly as important as position.
+So we'll ignore the others and focus entirely on that.
+The position attribute is usually composed of 3 values: an x, y, and z coordinate.
 Collectively, these represent a vertice's location in space.
+I say usually because it's also possible to use only 2 values or even 1 for the position attribute.
+For the sake of uniformity, though, our position attribute will have 3 values.
+
+This will serve as our foundation.
+Our vertex type will have one attribute with 3 values that will be interpreted as a position.
+
+
+
+
 
 Vertices
   Transformations

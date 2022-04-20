@@ -67,7 +67,6 @@ struct Bracket
   Vec3 mCenter;
   // The extent to the right side of the bracket from the center.
   Vec3 mExtent;
-  float mFill;
   AssetId mModelId;
   World::MemberId mLeftChild;
   World::MemberId mRightChild;
@@ -135,6 +134,12 @@ struct Bracket
   {
     owner.mSpace->Get<Comp::Model>(mLeftChild).mVisible = visible;
     owner.mSpace->Get<Comp::Model>(mRightChild).mVisible = visible;
+  }
+
+  void Fade(const World::Object& owner, float newAlpha)
+  {
+    owner.mSpace->Get<Comp::AlphaColor>(mLeftChild).mAlphaColor[3] = newAlpha;
+    owner.mSpace->Get<Comp::AlphaColor>(mRightChild).mAlphaColor[3] = newAlpha;
   }
 };
 
@@ -223,7 +228,6 @@ struct Table
   float mCellWidth;
   float mCellHeight;
   unsigned int mCount;
-  float mFill;
   float mThickness;
 
   void VInit(const World::Object& owner)
@@ -236,6 +240,16 @@ struct Table
     Fill(owner, 0.0f);
   }
 
+  float Height()
+  {
+    return mCellHeight * mCount - (mCount - 1) * mThickness;
+  }
+
+  float Width()
+  {
+    return mCellWidth;
+  }
+
   void Fill(const World::Object& owner, float fill)
   {
     owner.Get<Comp::Transform>().SetTranslation(mCenter);
@@ -245,14 +259,15 @@ struct Table
     for (int i = (int)owner.Children().Size(); i < requiredChildren; ++i) {
       World::Object child = owner.CreateChild();
       child.Add<Line>();
+      child.Add<Comp::AlphaColor>();
+      child.Get<Comp::Model>().mShaderId = AssLib::nColorShaderId;
     }
     for (int i = (int)owner.Children().Size() - 1; i >= requiredChildren; ++i) {
       owner.mSpace->DeleteMember(owner.Children()[i]);
     }
 
-    float height = mCellHeight * mCount - (mCount - 1) * mThickness;
-    float halfHeight = height / 2.0f;
-    float halfWidth = mCellWidth / 2.0f;
+    float halfHeight = Height() / 2.0f;
+    float halfWidth = Width() / 2.0f;
 
     // Horizontal Lines.
     float heightDiff = mCellHeight - mThickness;
@@ -286,6 +301,14 @@ struct Table
   {
     for (int i = 0; i < (int)owner.Children().Size(); ++i) {
       owner.mSpace->Get<Comp::Model>(owner.Children()[i]).mVisible = visible;
+    }
+  }
+
+  void Fade(const World::Object& owner, float newAlpha)
+  {
+    for (int i = 0; i < (int)owner.Children().Size(); ++i) {
+      owner.mSpace->Get<Comp::AlphaColor>(owner.Children()[i]).mAlphaColor[3] =
+        newAlpha;
     }
   }
 };
@@ -360,10 +383,9 @@ void VertexDescription(Sequence* sequence)
   });
 
   World::Object vertexSphere = spaceIt->CreateObject();
-  {
-    vertexSphere.Add<Comp::Model>().mModelId = AssLib::nSphereModelId;
-    vertexSphere.Get<Comp::Transform>().SetUniformScale(0.0f);
-  }
+  vertexSphere.Add<Comp::Model>().mModelId = AssLib::nSphereModelId;
+  vertexSphere.Get<Comp::Transform>().SetUniformScale(0.0f);
+
   ao.mName = "ExpandVertexSphere";
   ao.mDuration = 1.0f;
   ao.mEase = EaseType::QuadIn;
@@ -655,21 +677,137 @@ void VertexDescription(Sequence* sequence)
   });
   seq.Wait();
 
-  World::Object positionTable2D = spaceIt->CreateObject();
-  {
-    auto& table2D = positionTable2D.Add<Table>();
-    table2D.mCenter = {1.0f, 1.0f, 0.0f};
-    table2D.mCount = 2;
-    table2D.mCellWidth = 4.0f;
-    table2D.mCellHeight = 1.5f;
-  }
-  ao.mName = "Show2DPositionTable";
+  World::Object positionTable2dParent = spaceIt->CreateObject();
+  auto* transform = &positionTable2dParent.Add<Comp::Transform>();
+  transform->SetTranslation({1.0f, 1.0f, 0.0f});
+  World::Object positionTable2d = positionTable2dParent.CreateChild();
+  auto* table = &positionTable2d.Add<Table>();
+  table->mCenter = {0.0f, 0.0f, 0.0f};
+  table->mCount = 2;
+  table->mCellWidth = 4.0f;
+  table->mCellHeight = 1.25f;
+
+  ao.mName = "Show2dPositionTable";
   ao.mDuration = 1.0f;
   ao.mEase = EaseType::QuadIn;
   seq.Add(ao, [=](float t) {
-    positionTable2D.Get<Table>().Fill(positionTable2D, t);
+    positionTable2d.Get<Table>().Fill(positionTable2d, t);
   });
   seq.Wait();
+
+  World::Object table2dBracket = positionTable2dParent.CreateChild();
+  auto* bracket = &table2dBracket.Add<Bracket>();
+  bracket->mCenter = {-table->Width() / 2.0f - 0.5f, 0.0f, 0.0f};
+  bracket->mExtent = {0.0f, table->Height() / 2.0f, 0.0f};
+
+  ao.mName = "Show2dBracket";
+  ao.mDuration = 0.5f;
+  ao.mEase = EaseType::QuadIn;
+  seq.Add(ao, [=](float t) {
+    table2dBracket.Get<Bracket>().Fill(table2dBracket, -t);
+  });
+  seq.Wait();
+
+  World::Object table2dLabel = positionTable2dParent.CreateChild();
+  auto* text = &table2dLabel.Add<Comp::Text>();
+  text->mWidth = 0.0f;
+  text->mAlign = Comp::Text::Alignment::Right;
+  text->mFillAmount = 0.0f;
+  text->mText = "2D";
+  text->mFontId = fugazId;
+  transform = &table2dLabel.Get<Comp::Transform>();
+  transform->SetTranslation({-3.0f, -0.3f, 0.0f});
+  transform->SetUniformScale(0.7f);
+  table2dLabel.Add<Comp::AlphaColor>().mAlphaColor = {1.0f, 1.0f, 1.0f, 1.0f};
+
+  ao.mName = "Show2dLabel";
+  ao.mDuration = 0.5f;
+  ao.mEase = EaseType::QuadIn;
+  seq.Add(ao, [=](float t) {
+    table2dLabel.Get<Comp::Text>().mFillAmount = t;
+  });
+  seq.Wait();
+
+  World::Object positionTable3dParent = spaceIt->CreateObject();
+  transform = &positionTable3dParent.Add<Comp::Transform>();
+  Vec3 table3dTranslation = {1.0f, -2.5f, 0.0f};
+  transform->SetTranslation(table3dTranslation);
+  World::Object positionTable3d = positionTable3dParent.CreateChild();
+  table = &positionTable3d.Add<Table>();
+  table->mCenter = {0.0f, 0.0f, 0.0f};
+  table->mCount = 3;
+  table->mCellWidth = 4.0f;
+  table->mCellHeight = 1.25f;
+
+  ao.mName = "Show3dPositionTable";
+  ao.mDuration = 0.5f;
+  ao.mEase = EaseType::QuadIn;
+  seq.Add(ao, [=](float t) {
+    positionTable3d.Get<Table>().Fill(positionTable3d, t);
+  });
+  seq.Wait();
+
+  World::Object table3dBracket = positionTable3dParent.CreateChild();
+  bracket = &table3dBracket.Add<Bracket>();
+  bracket->mCenter = {-table->Width() / 2.0f - 0.5f, 0.0f, 0.0f};
+  bracket->mExtent = {0.0f, table->Height() / 2.0f, 0.0f};
+
+  ao.mName = "Show3dBracket";
+  ao.mDuration = 0.5f;
+  ao.mEase = EaseType::QuadIn;
+  seq.Add(ao, [=](float t) {
+    table3dBracket.Get<Bracket>().Fill(table3dBracket, -t);
+  });
+  seq.Wait();
+
+  World::Object table3dLabel = positionTable3dParent.CreateChild();
+  text = &table3dLabel.Add<Comp::Text>();
+  text->mWidth = 0.0f;
+  text->mAlign = Comp::Text::Alignment::Right;
+  text->mFillAmount = 0.0f;
+  text->mText = "3D";
+  text->mFontId = fugazId;
+  transform = &table3dLabel.Get<Comp::Transform>();
+  transform->SetTranslation({-3.0f, -0.3f, 0.0f});
+  transform->SetUniformScale(0.7f);
+  table3dLabel.Add<Comp::AlphaColor>().mAlphaColor = {1.0f, 1.0f, 1.0f, 1.0f};
+
+  ao.mName = "Show3DLabel";
+  ao.mDuration = 0.5f;
+  ao.mEase = EaseType::QuadIn;
+  seq.Add(ao, [=](float t) {
+    table3dLabel.Get<Comp::Text>().mFillAmount = t;
+  });
+  seq.Wait();
+
+  ao.mName = "Fade2dTable";
+  ao.mDuration = 1.0f;
+  ao.mEase = EaseType::QuadOut;
+  seq.Add(ao, [=](float t) {
+    float newAlpha = 1.0f - t;
+    positionTable2d.Get<Table>().Fade(positionTable2d, newAlpha);
+    table2dBracket.Get<Bracket>().Fade(table2dBracket, newAlpha);
+    table2dLabel.Get<Comp::AlphaColor>().mAlphaColor[3] = newAlpha;
+  });
+  seq.Wait();
+
+  ao.mName = "Hide2dTable";
+  ao.mDuration = 0.0f;
+  seq.Add(ao, [=](float t) {
+    bool visible = !(bool)(int)t;
+    positionTable2d.Get<Table>().Show(positionTable2d, visible);
+    table2dBracket.Get<Bracket>().Show(table2dBracket, visible);
+    table2dLabel.Get<Comp::Text>().mVisible = visible;
+  });
+  seq.Wait();
+
+  ao.mName = "Center3dTable";
+  ao.mDuration = 0.5f;
+  ao.mEase = EaseType::QuadOutIn;
+  seq.Add(ao, [=](float t) {
+    Vec3 translation = Interpolate(table3dTranslation, {1.0f, 0.0f, 0.0f}, t);
+    positionTable3dParent.Get<Comp::Transform>().SetTranslation(translation);
+  });
 }
 
 void TheFundamentalsOfGraphics(Sequence* sequence)
