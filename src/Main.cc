@@ -15,6 +15,7 @@
 #include <ds/Vector.h>
 #include <editor/Editor.h>
 #include <gfx/Font.h>
+#include <imgui/imgui.h>
 #include <math.h>
 #include <math/Constants.h>
 #include <math/Utility.h>
@@ -48,11 +49,17 @@ void CentralUpdate()
 
 void RegisterTypes()
 {
-  Registrar::Register<Line, Comp::Model>();
-  Registrar::Register<Bracket, Comp::Transform>();
-  Registrar::Register<Box, Comp::Model>();
-  Registrar::Register<Arrow, Comp::Model>();
-  Registrar::Register<Table, Comp::Transform>();
+  using namespace Comp;
+  Type<Line>::Register();
+  Type<Line>::AddDependencies<Comp::Model>();
+  Type<Bracket>::Register();
+  Type<Bracket>::AddDependencies<Comp::Transform>();
+  Type<Box>::Register();
+  Type<Box>::AddDependencies<Comp::Model>();
+  Type<Arrow>::Register();
+  Type<Arrow>::AddDependencies<Comp::Model>();
+  Type<Table>::Register();
+  Type<Table>::AddDependencies<Comp::Transform>();
 }
 
 int main(int argc, char* argv[])

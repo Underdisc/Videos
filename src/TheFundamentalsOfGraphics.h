@@ -1,4 +1,5 @@
 #include <comp/Camera.h>
+#include <comp/DefaultPostProcess.h>
 #include <comp/Model.h>
 #include <comp/Text.h>
 #include <comp/Transform.h>
@@ -75,7 +76,7 @@ struct Bracket
   {
     mCenter = {0.0f, 0.0f, 0.0f};
     mExtent = {1.0f, 0.0f, 0.0f};
-    mModelId = AssLib::CreateEmpty<Gfx::Model>("Bracket");
+    mModelId = AssLib::Create<Gfx::Model>("Bracket");
 
     World::Object leftChild = owner.CreateChild();
     World::Object rightChild = owner.CreateChild();
@@ -93,16 +94,16 @@ struct Bracket
     leftRotation.AngleAxis(Math::nPi, {0.0f, 1.0f, 0.0f});
     leftChild.Get<Comp::Transform>().SetRotation(leftRotation);
 
-    rightChild.Add<Comp::AlphaColor>().mAlphaColor = {1.0f, 1.0f, 1.0f, 1.0f};
-    leftChild.Add<Comp::AlphaColor>().mAlphaColor = {1.0f, 1.0f, 1.0f, 1.0f};
+    rightChild.Add<Comp::AlphaColor>().mColor = {1.0f, 1.0f, 1.0f, 1.0f};
+    leftChild.Add<Comp::AlphaColor>().mColor = {1.0f, 1.0f, 1.0f, 1.0f};
 
     Fill(owner, 0.0f);
   }
 
   void ChangeColor(const World::Object& owner, const Vec4& color)
   {
-    owner.mSpace->Get<Comp::AlphaColor>(mLeftChild).mAlphaColor = color;
-    owner.mSpace->Get<Comp::AlphaColor>(mRightChild).mAlphaColor = color;
+    owner.mSpace->Get<Comp::AlphaColor>(mLeftChild).mColor = color;
+    owner.mSpace->Get<Comp::AlphaColor>(mRightChild).mColor = color;
   }
 
   void Fill(const World::Object& owner, float fill)
@@ -138,8 +139,8 @@ struct Bracket
 
   void Fade(const World::Object& owner, float newAlpha)
   {
-    owner.mSpace->Get<Comp::AlphaColor>(mLeftChild).mAlphaColor[3] = newAlpha;
-    owner.mSpace->Get<Comp::AlphaColor>(mRightChild).mAlphaColor[3] = newAlpha;
+    owner.mSpace->Get<Comp::AlphaColor>(mLeftChild).mColor[3] = newAlpha;
+    owner.mSpace->Get<Comp::AlphaColor>(mRightChild).mColor[3] = newAlpha;
   }
 };
 
@@ -154,7 +155,7 @@ struct Box
     mCenter = {0.0f, 0.0f, 0.0f};
     mHeight = 2.0f;
     mWidth = 4.0f;
-    owner.Get<Comp::Model>().mModelId = AssLib::CreateEmpty<Gfx::Model>("Box");
+    owner.Get<Comp::Model>().mModelId = AssLib::Create<Gfx::Model>("Box");
     Fill(owner, 0.0f);
   }
 
@@ -195,8 +196,7 @@ struct Arrow
 
   void VInit(const World::Object& owner)
   {
-    owner.Get<Comp::Model>().mModelId =
-      AssLib::CreateEmpty<Gfx::Model>("Arrow");
+    owner.Get<Comp::Model>().mModelId = AssLib::Create<Gfx::Model>("Arrow");
     mStart = {0.0f, 0.0f, 0.0f};
     mEnd = {0.0f, 0.0f, 0.0f};
     Fill(owner, 0.0f);
@@ -307,7 +307,7 @@ struct Table
   void Fade(const World::Object& owner, float newAlpha)
   {
     for (int i = 0; i < (int)owner.Children().Size(); ++i) {
-      owner.mSpace->Get<Comp::AlphaColor>(owner.Children()[i]).mAlphaColor[3] =
+      owner.mSpace->Get<Comp::AlphaColor>(owner.Children()[i]).mColor[3] =
         newAlpha;
     }
   }
@@ -316,27 +316,30 @@ struct Table
 void VertexDescription(Sequence* sequence)
 {
   Sequence& seq = *sequence;
-  World::SpaceIt spaceIt = World::CreateTopSpace();
-  World::Object camera = spaceIt->CreateObject();
+  World::LayerIt layerIt = World::CreateTopLayer();
+  World::Space& space = layerIt->mSpace;
+  World::Object camera = space.CreateObject();
   Comp::Camera& cameraComp = camera.Add<Comp::Camera>();
   cameraComp.mProjectionType = Comp::Camera::ProjectionType::Orthographic;
   cameraComp.mHeight = 10.0f;
   Comp::Transform& cameraTransform = camera.Get<Comp::Transform>();
   cameraTransform.SetTranslation({0.0f, 0.0f, 10.0f});
   cameraComp.LocalLookAt({0.0f, 0.0f, 0.0f}, {0.0f, 1.0f, 0.0f}, camera);
-  spaceIt->mCameraId = camera.mMemberId;
+  layerIt->mCameraId = camera.mMemberId;
+
+  World::Object postProcess = space.CreateObject();
+  postProcess.Add<DefaultPostProcess>();
 
   World::Object vertexLines[8];
   for (int i = 0; i < 8; ++i) {
-    vertexLines[i] = spaceIt->CreateObject();
+    vertexLines[i] = space.CreateObject();
     auto& line = vertexLines[i].Add<Line>();
     line.mEnd = {0.0f, 0.0f, 0.0f};
     line.mStart = {0.0f, 0.0f, 0.0f};
     line.UpdateTransform(vertexLines[i]);
 
     vertexLines[i].Get<Comp::Model>().mShaderId = AssLib::nColorShaderId;
-    vertexLines[i].Add<Comp::AlphaColor>().mAlphaColor = {
-      1.0f, 1.0f, 1.0f, 1.0f};
+    vertexLines[i].Add<Comp::AlphaColor>().mColor = {1.0f, 1.0f, 1.0f, 1.0f};
   }
   Sequence::AddOptions ao;
   ao.mName = "ExpandVertexLines";
@@ -382,7 +385,7 @@ void VertexDescription(Sequence* sequence)
     }
   });
 
-  World::Object vertexSphere = spaceIt->CreateObject();
+  World::Object vertexSphere = space.CreateObject();
   vertexSphere.Add<Comp::Model>().mModelId = AssLib::nSphereModelId;
   vertexSphere.Get<Comp::Transform>().SetUniformScale(0.0f);
 
@@ -395,7 +398,7 @@ void VertexDescription(Sequence* sequence)
   seq.Wait();
   seq.Gap(0.5f);
 
-  World::Object vertexBracket = spaceIt->CreateChildObject(vertexSphere);
+  World::Object vertexBracket = space.CreateChildObject(vertexSphere);
   {
     auto& bracket = vertexBracket.Add<Bracket>().mCenter = {0.0f, 1.5f, 0.0f};
   }
@@ -407,11 +410,8 @@ void VertexDescription(Sequence* sequence)
   });
   seq.Wait();
 
-  AssetId fugazId = AssLib::CreateEmpty<Gfx::Font>("FugazOne");
-  AssLib::Asset<Gfx::Font>& font = AssLib::GetAsset<Gfx::Font>(fugazId);
-  font.mPaths.Push("font/fugazOne/font.ttf");
-  font.FullInit();
-
+  AssetId fugazId =
+    AssLib::Create<Gfx::Font>("FugazOne", "font/fugazOne/font.ttf");
   World::Object vertexLabel = vertexSphere.CreateChild();
   {
     auto& text = vertexLabel.Add<Comp::Text>();
@@ -422,7 +422,7 @@ void VertexDescription(Sequence* sequence)
     auto& transform = vertexLabel.Get<Comp::Transform>();
     transform.SetTranslation({0.0f, 2.0f, 0.0f});
     transform.SetUniformScale(0.7f);
-    vertexLabel.Add<Comp::AlphaColor>().mAlphaColor = {1.0f, 1.0f, 1.0f, 1.0f};
+    vertexLabel.Add<Comp::AlphaColor>().mColor = {1.0f, 1.0f, 1.0f, 1.0f};
   }
   ao.mName = "ShowVertexLabel";
   ao.mDuration = 0.5f;
@@ -449,13 +449,12 @@ void VertexDescription(Sequence* sequence)
   boxCenters[1] = {0.0f, 0.0f, 0.0f};
   boxCenters[2] = {0.0f, -2.0f, 0.0f};
   for (int i = 0; i < 3; ++i) {
-    attributeBoxes[i] = spaceIt->CreateObject();
+    attributeBoxes[i] = space.CreateObject();
     auto& box = attributeBoxes[i].Add<Box>();
     box.mWidth = 5.0f;
     box.mHeight = 1.25f;
     box.mCenter = boxCenters[i];
-    attributeBoxes[i].Add<Comp::AlphaColor>().mAlphaColor = {
-      0.0f, 1.0f, 0.0f, 1.0f};
+    attributeBoxes[i].Add<Comp::AlphaColor>().mColor = {0.0f, 1.0f, 0.0f, 1.0f};
     attributeBoxes[i].Get<Comp::Model>().mShaderId = AssLib::nColorShaderId;
 
     seq.Gap(0.15f);
@@ -474,7 +473,7 @@ void VertexDescription(Sequence* sequence)
   connectorEnds[1] = {-2.5f, 0.0f, -0.1f};
   connectorEnds[2] = {-2.5f, -2.0f, -0.1f};
   for (int i = 0; i < 3; ++i) {
-    attributeConnectors[i] = spaceIt->CreateObject();
+    attributeConnectors[i] = space.CreateObject();
     auto& line = attributeConnectors[i].Add<Line>();
     line.mStart = finalVertexSpherePosition;
     line.mEnd = finalVertexSpherePosition;
@@ -482,7 +481,7 @@ void VertexDescription(Sequence* sequence)
     line.UpdateTransform(attributeConnectors[i]);
     attributeConnectors[i].Get<Comp::Model>().mShaderId =
       AssLib::nColorShaderId;
-    attributeConnectors[i].Add<Comp::AlphaColor>().mAlphaColor = {
+    attributeConnectors[i].Add<Comp::AlphaColor>().mColor = {
       1.0f, 1.0f, 1.0f, 1.0f};
     seq.Gap(0.1f);
     ao.mName = "ExpandConnector";
@@ -496,7 +495,7 @@ void VertexDescription(Sequence* sequence)
   }
   seq.Wait();
 
-  World::Object attributeLabel = spaceIt->CreateObject();
+  World::Object attributeLabel = space.CreateObject();
   {
     auto& text = attributeLabel.Add<Comp::Text>();
     text.mFontId = fugazId;
@@ -506,8 +505,7 @@ void VertexDescription(Sequence* sequence)
     auto& transform = attributeLabel.Get<Comp::Transform>();
     transform.SetTranslation({6.5f, -0.3f, 0.0f});
     transform.SetUniformScale(0.7f);
-    attributeLabel.Add<Comp::AlphaColor>().mAlphaColor = {
-      1.0f, 1.0f, 1.0f, 1.0f};
+    attributeLabel.Add<Comp::AlphaColor>().mColor = {1.0f, 1.0f, 1.0f, 1.0f};
   }
   ao.mName = "ShowAttributeLabel";
   ao.mDuration = 1.0f;
@@ -527,11 +525,11 @@ void VertexDescription(Sequence* sequence)
   arrowEnds[1] = {3.2f, 0.0f, 0.0f};
   arrowEnds[2] = {3.2f, -1.5f, 0.0f};
   for (int i = 0; i < 3; ++i) {
-    attributeArrows[i] = spaceIt->CreateObject();
+    attributeArrows[i] = space.CreateObject();
     auto& arrow = attributeArrows[i].Add<Arrow>();
     arrow.mStart = arrowStarts[i];
     arrow.mEnd = arrowEnds[i];
-    attributeArrows[i].Add<Comp::AlphaColor>().mAlphaColor = {
+    attributeArrows[i].Add<Comp::AlphaColor>().mColor = {
       1.0f, 1.0f, 1.0f, 1.0f};
     attributeArrows[i].Get<Comp::Model>().mShaderId = AssLib::nColorShaderId;
 
@@ -547,7 +545,7 @@ void VertexDescription(Sequence* sequence)
 
   World::Object attributeFlashes[3];
   for (int i = 0; i < 3; ++i) {
-    attributeFlashes[i] = spaceIt->CreateObject();
+    attributeFlashes[i] = space.CreateObject();
     Vec3 flashCenter = boxCenters[i];
     flashCenter[2] = -1.0f;
     auto& transform = attributeFlashes[i].Add<Comp::Transform>();
@@ -556,20 +554,20 @@ void VertexDescription(Sequence* sequence)
     auto& model = attributeFlashes[i].Add<Comp::Model>();
     model.mModelId = AssLib::nCubeModelId;
     model.mShaderId = AssLib::nColorShaderId;
-    attributeFlashes[i].Add<Comp::AlphaColor>().mAlphaColor = {
+    attributeFlashes[i].Add<Comp::AlphaColor>().mColor = {
       1.0f, 1.0f, 1.0f, 0.0f};
     seq.Gap(0.25f);
     ao.mName = "FlashAttribute";
     ao.mDuration = 1.5f;
     ao.mEase = EaseType::Flash;
     seq.Add(ao, [=](float t) {
-      attributeFlashes[i].Get<Comp::AlphaColor>().mAlphaColor[3] = t;
+      attributeFlashes[i].Get<Comp::AlphaColor>().mColor[3] = t;
     });
   }
   seq.Wait();
   seq.Gap(1.0f);
 
-  World::Object positionLabel = spaceIt->CreateChildObject(attributeBoxes[0]);
+  World::Object positionLabel = space.CreateChildObject(attributeBoxes[0]);
   {
     auto& text = positionLabel.Add<Comp::Text>();
     text.mText = "Position";
@@ -579,8 +577,7 @@ void VertexDescription(Sequence* sequence)
     auto& transform = positionLabel.Get<Comp::Transform>();
     transform.SetTranslation({0.0f, -0.35f, 0.0f});
     transform.SetUniformScale(0.7f);
-    positionLabel.Add<Comp::AlphaColor>().mAlphaColor = {
-      1.0f, 1.0f, 1.0f, 1.0f};
+    positionLabel.Add<Comp::AlphaColor>().mColor = {1.0f, 1.0f, 1.0f, 1.0f};
   }
   ao.mName = "ShowPosition";
   ao.mDuration = 0.5f;
@@ -591,19 +588,14 @@ void VertexDescription(Sequence* sequence)
   seq.Wait();
   seq.Gap(1.0f);
 
-  AssetId heartId = AssLib::CreateEmpty<Gfx::Model>("Heart");
-  AssLib::Asset<Gfx::Model>& heartAsset = AssLib::GetAsset<Gfx::Model>(heartId);
-  heartAsset.mPaths.Push("model/heart.obj");
-  heartAsset.FullInit();
-
+  AssetId heartId = AssLib::Create<Gfx::Model>("Heart", "model/heart.obj");
   World::Object loveAttributes[2];
   for (int i = 0; i < 2; ++i) {
-    loveAttributes[i] = spaceIt->CreateObject();
+    loveAttributes[i] = space.CreateObject();
     auto& model = loveAttributes[i].Add<Comp::Model>();
     model.mModelId = heartId;
     model.mShaderId = AssLib::nColorShaderId;
-    loveAttributes[i].Add<Comp::AlphaColor>().mAlphaColor = {
-      1.0f, 1.0f, 1.0f, 1.0f};
+    loveAttributes[i].Add<Comp::AlphaColor>().mColor = {1.0f, 1.0f, 1.0f, 1.0f};
     Vec3 translation = boxCenters[i + 1];
     translation[2] = 1.0f;
     auto& transform = loveAttributes[i].Get<Comp::Transform>();
@@ -626,16 +618,15 @@ void VertexDescription(Sequence* sequence)
   seq.Add(ao, [=](float t) {
     float newAlpha = 1.0f - t;
     for (int i = 0; i < 2; ++i) {
-      attributeConnectors[i + 1].Get<Comp::AlphaColor>().mAlphaColor[3] =
-        newAlpha;
-      attributeBoxes[i + 1].Get<Comp::AlphaColor>().mAlphaColor[3] = newAlpha;
-      loveAttributes[i].Get<Comp::AlphaColor>().mAlphaColor[3] = newAlpha;
+      attributeConnectors[i + 1].Get<Comp::AlphaColor>().mColor[3] = newAlpha;
+      attributeBoxes[i + 1].Get<Comp::AlphaColor>().mColor[3] = newAlpha;
+      loveAttributes[i].Get<Comp::AlphaColor>().mColor[3] = newAlpha;
     }
     for (int i = 0; i < 3; ++i) {
-      attributeArrows[i].Get<Comp::AlphaColor>().mAlphaColor[3] = newAlpha;
+      attributeArrows[i].Get<Comp::AlphaColor>().mColor[3] = newAlpha;
     }
-    attributeLabel.Get<Comp::AlphaColor>().mAlphaColor[3] = newAlpha;
-    vertexLabel.Get<Comp::AlphaColor>().mAlphaColor[3] = newAlpha;
+    attributeLabel.Get<Comp::AlphaColor>().mColor[3] = newAlpha;
+    vertexLabel.Get<Comp::AlphaColor>().mColor[3] = newAlpha;
     vertexBracket.Get<Bracket>().ChangeColor(
       vertexBracket, {1.0f, 1.0f, 1.0f, newAlpha});
   });
@@ -677,7 +668,7 @@ void VertexDescription(Sequence* sequence)
   });
   seq.Wait();
 
-  World::Object positionTable2dParent = spaceIt->CreateObject();
+  World::Object positionTable2dParent = space.CreateObject();
   auto* transform = &positionTable2dParent.Add<Comp::Transform>();
   transform->SetTranslation({1.0f, 1.0f, 0.0f});
   World::Object positionTable2d = positionTable2dParent.CreateChild();
@@ -718,7 +709,7 @@ void VertexDescription(Sequence* sequence)
   transform = &table2dLabel.Get<Comp::Transform>();
   transform->SetTranslation({-3.0f, -0.3f, 0.0f});
   transform->SetUniformScale(0.7f);
-  table2dLabel.Add<Comp::AlphaColor>().mAlphaColor = {1.0f, 1.0f, 1.0f, 1.0f};
+  table2dLabel.Add<Comp::AlphaColor>().mColor = {1.0f, 1.0f, 1.0f, 1.0f};
 
   ao.mName = "Show2dLabel";
   ao.mDuration = 0.5f;
@@ -728,7 +719,7 @@ void VertexDescription(Sequence* sequence)
   });
   seq.Wait();
 
-  World::Object positionTable3dParent = spaceIt->CreateObject();
+  World::Object positionTable3dParent = space.CreateObject();
   transform = &positionTable3dParent.Add<Comp::Transform>();
   Vec3 table3dTranslation = {1.0f, -2.5f, 0.0f};
   transform->SetTranslation(table3dTranslation);
@@ -770,7 +761,7 @@ void VertexDescription(Sequence* sequence)
   transform = &table3dLabel.Get<Comp::Transform>();
   transform->SetTranslation({-3.0f, -0.3f, 0.0f});
   transform->SetUniformScale(0.7f);
-  table3dLabel.Add<Comp::AlphaColor>().mAlphaColor = {1.0f, 1.0f, 1.0f, 1.0f};
+  table3dLabel.Add<Comp::AlphaColor>().mColor = {1.0f, 1.0f, 1.0f, 1.0f};
 
   ao.mName = "Show3DLabel";
   ao.mDuration = 0.5f;
@@ -787,7 +778,7 @@ void VertexDescription(Sequence* sequence)
     float newAlpha = 1.0f - t;
     positionTable2d.Get<Table>().Fade(positionTable2d, newAlpha);
     table2dBracket.Get<Bracket>().Fade(table2dBracket, newAlpha);
-    table2dLabel.Get<Comp::AlphaColor>().mAlphaColor[3] = newAlpha;
+    table2dLabel.Get<Comp::AlphaColor>().mColor[3] = newAlpha;
   });
   seq.Wait();
 
