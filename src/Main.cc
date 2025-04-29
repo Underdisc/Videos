@@ -1,14 +1,12 @@
 // Varkor Commit Hash: b2fb779
 
-#include <AssetLibrary.h>
 #include <Input.h>
-#include <Registrar.h>
 #include <Result.h>
 #include <Temporal.h>
 #include <VarkorMain.h>
 #include <comp/AlphaColor.h>
 #include <comp/Camera.h>
-#include <comp/Model.h>
+#include <comp/Mesh.h>
 #include <comp/Text.h>
 #include <comp/Transform.h>
 #include <debug/Draw.h>
@@ -20,6 +18,7 @@
 #include <math/Constants.h>
 #include <math/Utility.h>
 #include <util/Utility.h>
+#include <world/Registrar.h>
 #include <world/World.h>
 
 #include "TheFundamentalsOfGraphics.h"
@@ -50,25 +49,28 @@ void CentralUpdate()
 void RegisterTypes()
 {
   using namespace Comp;
-  Type<Line>::Register();
-  Type<Line>::AddDependencies<Comp::Model>();
-  Type<Bracket>::Register();
-  Type<Bracket>::AddDependencies<Comp::Transform>();
-  Type<Box>::Register();
-  Type<Box>::AddDependencies<Comp::Model>();
-  Type<Arrow>::Register();
-  Type<Arrow>::AddDependencies<Comp::Model>();
-  Type<Table>::Register();
-  Type<Table>::AddDependencies<Comp::Transform>();
+  RegisterComponent(Line);
+  RegisterDependencies(Line, Mesh);
+  RegisterComponent(Bracket);
+  RegisterDependencies(Bracket, Transform);
+  RegisterComponent(Box);
+  RegisterDependencies(Box, Mesh);
+  RegisterComponent(Arrow);
+  RegisterDependencies(Arrow, Mesh);
+  RegisterComponent(Table);
+  RegisterDependencies(Table, Transform);
 }
 
 int main(int argc, char* argv[])
 {
   Registrar::nRegisterCustomTypes = RegisterTypes;
-  Result result = VarkorInit(argc, argv, "Varkor Videos", PROJECT_DIRECTORY);
-  if (!result.Success()) {
-    return 0;
-  }
+
+  Options::Config config;
+  config.mEditorLevel = Options::EditorLevel::Complete;
+  config.mProjectDirectory = PROJECT_DIRECTORY;
+  config.mWindowName = "Videos";
+  Result result = VarkorInit(argc, argv, std::move(config));
+  LogAbortIf(!result.Success(), result.mError.c_str());
 
   TheFundamentalsOfGraphics(&gSequence);
   World::nCentralUpdate = CentralUpdate;

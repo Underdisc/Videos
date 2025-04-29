@@ -1,17 +1,17 @@
 #include <comp/Camera.h>
-#include <comp/DefaultPostProcess.h>
-#include <comp/Model.h>
+#include <comp/LineMesh.h>
+#include <comp/Relationship.h>
 #include <comp/Text.h>
 #include <comp/Transform.h>
-#include <gfx/LineModel.h>
-#include <gfx/Model.h>
+#include <editor/gizmos/Gizmos.h>
+#include <gfx/Material.h>
+#include <gfx/Mesh.h>
 #include <math/Constants.h>
 #include <math/Utility.h>
+#include <rsl/Library.h>
 #include <world/World.h>
 
 #include "Sequence.h"
-
-#include <iostream>
 
 struct Line
 {
@@ -21,11 +21,17 @@ struct Line
 
   void VInit(const World::Object& owner)
   {
+    static Rsl::Asset& lines = Rsl::AddAsset("Lines");
+    static int lineCount = 0;
+    std::string resName = std::to_string(lineCount++);
+    lines.InitRes<Gfx::Material>(resName, "vres/renderer:Color")
+      .Add<Vec4>("uColor") = {1, 1, 1, 1};
+    owner.Get<Comp::Mesh>().mMaterialId = ResId("Lines", resName);
+    owner.Get<Comp::Mesh>().mMeshId = Editor::Gizmos::nCubeMeshId;
+
     mThickness = 0.2f;
     mStart = {0.0f, 0.0f, 0.0f};
     mEnd = {0.0f, 0.0f, 0.0f};
-
-    owner.Get<Comp::Model>().mModelId = AssLib::nCubeModelId;
   }
 
   void UpdateTransform(const World::Object& owner)
@@ -37,8 +43,7 @@ struct Line
       transform.SetUniformScale(0.0f);
       return;
     }
-    Math::Quaternion rotation;
-    rotation.FromTo({1.0f, 0.0f, 0.0f}, direction / directionMag);
+    Quat rotation = Quat::FromTo({1.0f, 0.0f, 0.0f}, direction / directionMag);
     transform.SetRotation(rotation);
     transform.SetScale(
       {directionMag / 2.0f, mThickness / 2.0f, mThickness / 2.0f});
@@ -59,7 +64,7 @@ struct Line
 
   void Show(const World::Object& owner, bool visible)
   {
-    owner.Get<Comp::Model>().mVisible = visible;
+    owner.Get<Comp::Mesh>().mVisible = visible;
   }
 };
 
@@ -68,42 +73,45 @@ struct Bracket
   Vec3 mCenter;
   // The extent to the right side of the bracket from the center.
   Vec3 mExtent;
-  AssetId mModelId;
+  ResId mMeshId;
+  ResId mMaterialId;
   World::MemberId mLeftChild;
   World::MemberId mRightChild;
 
   void VInit(const World::Object& owner)
   {
-    mCenter = {0.0f, 0.0f, 0.0f};
-    mExtent = {1.0f, 0.0f, 0.0f};
-    mModelId = AssLib::Create<Gfx::Model>("Bracket");
+    static Rsl::Asset& brackets = Rsl::AddAsset("Brackets");
+    static int bracketCount = 0;
+    std::string resName = std::to_string(bracketCount++);
+    mMeshId = ResId("Brackets", resName);
+    mMaterialId = ResId("Brackets", resName);
+    brackets.InitRes<Gfx::Mesh>(resName);
+    brackets.InitRes<Gfx::Material>(resName, "vres/renderer:Color")
+      .Add<Vec4>("uColor", {1, 1, 1, 1});
 
     World::Object leftChild = owner.CreateChild();
     World::Object rightChild = owner.CreateChild();
     mLeftChild = leftChild.mMemberId;
     mRightChild = rightChild.mMemberId;
 
-    auto& rightModel = rightChild.Add<Comp::Model>();
-    rightModel.mModelId = mModelId;
-    rightModel.mShaderId = AssLib::nColorShaderId;
-    auto& leftModel = leftChild.Add<Comp::Model>();
-    leftModel.mModelId = mModelId;
-    leftModel.mShaderId = AssLib::nColorShaderId;
+    auto& rightMesh = rightChild.Add<Comp::Mesh>();
+    rightMesh.mMeshId = mMeshId;
+    rightMesh.mMaterialId = mMaterialId;
+    auto& leftModel = leftChild.Add<Comp::Mesh>();
+    leftModel.mMeshId = mMeshId;
+    leftModel.mMaterialId = mMaterialId;
 
-    Math::Quaternion leftRotation;
-    leftRotation.AngleAxis(Math::nPi, {0.0f, 1.0f, 0.0f});
+    Quat leftRotation = Quat::AngleAxis(Math::nPi, {0.0f, 1.0f, 0.0f});
     leftChild.Get<Comp::Transform>().SetRotation(leftRotation);
 
-    rightChild.Add<Comp::AlphaColor>().mColor = {1.0f, 1.0f, 1.0f, 1.0f};
-    leftChild.Add<Comp::AlphaColor>().mColor = {1.0f, 1.0f, 1.0f, 1.0f};
-
+    mCenter = {0.0f, 0.0f, 0.0f};
+    mExtent = {1.0f, 0.0f, 0.0f};
     Fill(owner, 0.0f);
   }
 
   void ChangeColor(const World::Object& owner, const Vec4& color)
   {
-    owner.mSpace->Get<Comp::AlphaColor>(mLeftChild).mColor = color;
-    owner.mSpace->Get<Comp::AlphaColor>(mRightChild).mColor = color;
+    Rsl::GetRes<Gfx::Material>(mMaterialId).Get<Vec4>("uColor") = color;
   }
 
   void Fill(const World::Object& owner, float fill)
@@ -115,17 +123,16 @@ struct Bracket
     points.Push({extentLength, 0.0f, 0.0f});
     points.Push({extentLength, -0.4f, 0.0f});
 
-    Gfx::InitLineModel(
-      mModelId,
+    InitLineMesh(
+      mMeshId,
       points,
       fill,
       0.25f,
-      Gfx::TerminalType::CollapsedNormal,
-      Gfx::TerminalType::CollapsedNormal);
+      TerminalType::CollapsedNormal,
+      TerminalType::CollapsedNormal);
 
-    Math::Quaternion extentRotation;
     Vec3 normalExtent = Math::Normalize(mExtent);
-    extentRotation.FromTo({1.0f, 0.0f, 0.0f}, normalExtent);
+    Quat extentRotation = Quat::FromTo({1.0f, 0.0f, 0.0f}, normalExtent);
     auto& transform = owner.Get<Comp::Transform>();
     transform.SetRotation(extentRotation);
     transform.SetTranslation(mCenter);
@@ -133,14 +140,13 @@ struct Bracket
 
   void Show(const World::Object& owner, bool visible)
   {
-    owner.mSpace->Get<Comp::Model>(mLeftChild).mVisible = visible;
-    owner.mSpace->Get<Comp::Model>(mRightChild).mVisible = visible;
+    owner.mSpace->Get<Comp::Mesh>(mLeftChild).mVisible = visible;
+    owner.mSpace->Get<Comp::Mesh>(mRightChild).mVisible = visible;
   }
 
   void Fade(const World::Object& owner, float newAlpha)
   {
-    owner.mSpace->Get<Comp::AlphaColor>(mLeftChild).mColor[3] = newAlpha;
-    owner.mSpace->Get<Comp::AlphaColor>(mRightChild).mColor[3] = newAlpha;
+    Rsl::GetRes<Gfx::Material>(mMaterialId).Get<Vec4>("uColor")[3] = newAlpha;
   }
 };
 
@@ -152,10 +158,16 @@ struct Box
 
   void VInit(const World::Object& owner)
   {
+    static Rsl::Asset& boxes = Rsl::AddAsset("Boxes");
+    static int boxCount = 0;
+    std::string resName = std::to_string(boxCount++);
+    owner.Get<Comp::Mesh>().mMeshId = ResId("Boxes", resName);
+    owner.Get<Comp::Mesh>().mMaterialId = ResId("Boxes", resName);
+    boxes.InitRes<Gfx::Mesh>(resName);
+    boxes.InitRes<Gfx::Material>(resName, "vres/renderer:Color");
     mCenter = {0.0f, 0.0f, 0.0f};
     mHeight = 2.0f;
     mWidth = 4.0f;
-    owner.Get<Comp::Model>().mModelId = AssLib::Create<Gfx::Model>("Box");
     Fill(owner, 0.0f);
   }
 
@@ -172,20 +184,20 @@ struct Box
     points.Push({-halfWidth, -halfHeight, 0.0f});
     points.Push({-halfWidth, halfHeight - thickness / 2.0f, 0.0f});
 
-    Gfx::InitLineModel(
-      owner.Get<Comp::Model>().mModelId,
+    InitLineMesh(
+      owner.Get<Comp::Mesh>().mMeshId,
       points,
       fill,
       thickness,
-      Gfx::TerminalType::Flat,
-      Gfx::TerminalType::Flat);
+      TerminalType::Flat,
+      TerminalType::Flat);
 
     owner.Get<Comp::Transform>().SetTranslation(mCenter);
   }
 
   void Show(const World::Object& owner, bool visible)
   {
-    owner.Get<Comp::Model>().mVisible = visible;
+    owner.Get<Comp::Mesh>().mVisible = visible;
   }
 };
 
@@ -196,7 +208,14 @@ struct Arrow
 
   void VInit(const World::Object& owner)
   {
-    owner.Get<Comp::Model>().mModelId = AssLib::Create<Gfx::Model>("Arrow");
+    static Rsl::Asset& arrows = Rsl::AddAsset("Arrows");
+    static int arrowCount = 0;
+    std::string resName = std::to_string(arrowCount++);
+    owner.Get<Comp::Mesh>().mMeshId = ResId("Arrows", resName);
+    owner.Get<Comp::Mesh>().mMaterialId = ResId("Arrows", resName);
+    arrows.InitRes<Gfx::Mesh>(resName);
+    arrows.InitRes<Gfx::Material>(resName, "vres/renderer:Color");
+
     mStart = {0.0f, 0.0f, 0.0f};
     mEnd = {0.0f, 0.0f, 0.0f};
     Fill(owner, 0.0f);
@@ -207,18 +226,18 @@ struct Arrow
     Ds::Vector<Vec3> points;
     points.Push(mStart);
     points.Push(mEnd);
-    Gfx::InitLineModel(
-      owner.Get<Comp::Model>().mModelId,
+    InitLineMesh(
+      owner.Get<Comp::Mesh>().mMeshId,
       points,
       fill,
       0.2f,
-      Gfx::TerminalType::CollapsedBinormal,
-      Gfx::TerminalType::Arrow);
+      TerminalType::CollapsedBinormal,
+      TerminalType::Arrow);
   }
 
   void Show(const World::Object& owner, bool visible)
   {
-    owner.Get<Comp::Model>().mVisible = visible;
+    owner.Get<Comp::Mesh>().mVisible = visible;
   }
 };
 
@@ -256,14 +275,13 @@ struct Table
 
     // Make sure the parent has the correct number of children.
     int requiredChildren = 4 + (mCount - 1);
-    for (int i = (int)owner.Children().Size(); i < requiredChildren; ++i) {
-      World::Object child = owner.CreateChild();
-      child.Add<Line>();
-      child.Add<Comp::AlphaColor>();
-      child.Get<Comp::Model>().mShaderId = AssLib::nColorShaderId;
+    size_t childCount = owner.Get<Comp::Relationship>().mChildren.Size();
+    for (size_t i = childCount; i < requiredChildren; ++i) {
+      owner.CreateChild().Add<Line>();
     }
-    for (int i = (int)owner.Children().Size() - 1; i >= requiredChildren; ++i) {
-      owner.mSpace->DeleteMember(owner.Children()[i]);
+    childCount = owner.Get<Comp::Relationship>().mChildren.Size();
+    for (int i = childCount - 1; i >= requiredChildren; --i) {
+      owner.mSpace->DeleteMember(owner.Get<Comp::Relationship>().mChildren[i]);
     }
 
     float halfHeight = Height() / 2.0f;
@@ -272,12 +290,13 @@ struct Table
     // Horizontal Lines.
     float heightDiff = mCellHeight - mThickness;
     float currentOffset = halfHeight - mThickness / 2.0f;
+    const auto& relationship = owner.Get<Comp::Relationship>();
     for (int i = 0; i < (int)mCount + 1; ++i) {
-      auto& line = owner.mSpace->Get<Line>(owner.Children()[i]);
+      auto& line = owner.mSpace->Get<Line>(relationship.mChildren[i]);
       line.mStart = {fill * halfWidth, currentOffset, 0.0f};
       line.mEnd = {-fill * halfWidth, currentOffset, 0.0f};
       line.mThickness = mThickness;
-      World::Object childOwner(owner.mSpace, owner.Children()[i]);
+      World::Object childOwner(owner.mSpace, relationship.mChildren[i]);
       line.UpdateTransform(childOwner);
       currentOffset -= heightDiff;
     }
@@ -287,11 +306,11 @@ struct Table
     currentOffset = halfWidth - mThickness / 2.0f;
     for (int i = 0; i < 2; ++i) {
       int index = (int)mCount + 1 + i;
-      auto& line = owner.mSpace->Get<Line>(owner.Children()[index]);
+      auto& line = owner.mSpace->Get<Line>(relationship.mChildren[index]);
       line.mStart = {currentOffset, fill * halfHeight, 0.0f};
       line.mEnd = {currentOffset, -fill * halfHeight, 0.0f};
       line.mThickness = mThickness;
-      World::Object childOwner(owner.mSpace, owner.Children()[index]);
+      World::Object childOwner(owner.mSpace, relationship.mChildren[index]);
       line.UpdateTransform(childOwner);
       currentOffset -= widthDiff;
     }
@@ -299,16 +318,20 @@ struct Table
 
   void Show(const World::Object& owner, bool visible)
   {
-    for (int i = 0; i < (int)owner.Children().Size(); ++i) {
-      owner.mSpace->Get<Comp::Model>(owner.Children()[i]).mVisible = visible;
+    const auto& relationship = owner.Get<Comp::Relationship>();
+    for (int i = 0; i < (int)relationship.mChildren.Size(); ++i) {
+      owner.mSpace->Get<Comp::Mesh>(relationship.mChildren[i]).mVisible =
+        visible;
     }
   }
 
   void Fade(const World::Object& owner, float newAlpha)
   {
-    for (int i = 0; i < (int)owner.Children().Size(); ++i) {
-      owner.mSpace->Get<Comp::AlphaColor>(owner.Children()[i]).mColor[3] =
-        newAlpha;
+    const auto& relationship = owner.Get<Comp::Relationship>();
+    for (World::MemberId childId : relationship.mChildren) {
+      const World::Object& child = World::Object(owner.mSpace, childId);
+      Rsl::GetRes<Gfx::Material>(child.Get<Comp::Mesh>().mMaterialId)
+        .Get<Vec4>("uColor")[3] = newAlpha;
     }
   }
 };
@@ -327,9 +350,6 @@ void VertexDescription(Sequence* sequence)
   cameraComp.LocalLookAt({0.0f, 0.0f, 0.0f}, {0.0f, 1.0f, 0.0f}, camera);
   layerIt->mCameraId = camera.mMemberId;
 
-  World::Object postProcess = space.CreateObject();
-  postProcess.Add<DefaultPostProcess>();
-
   World::Object vertexLines[8];
   for (int i = 0; i < 8; ++i) {
     vertexLines[i] = space.CreateObject();
@@ -338,8 +358,8 @@ void VertexDescription(Sequence* sequence)
     line.mStart = {0.0f, 0.0f, 0.0f};
     line.UpdateTransform(vertexLines[i]);
 
-    vertexLines[i].Get<Comp::Model>().mShaderId = AssLib::nColorShaderId;
-    vertexLines[i].Add<Comp::AlphaColor>().mColor = {1.0f, 1.0f, 1.0f, 1.0f};
+    Rsl::GetRes<Gfx::Material>(vertexLines[i].Get<Comp::Mesh>().mMaterialId)
+      .Add<Vec4>("uColor") = {1, 1, 1, 1};
   }
   Sequence::AddOptions ao;
   ao.mName = "ExpandVertexLines";
@@ -386,7 +406,7 @@ void VertexDescription(Sequence* sequence)
   });
 
   World::Object vertexSphere = space.CreateObject();
-  vertexSphere.Add<Comp::Model>().mModelId = AssLib::nSphereModelId;
+  vertexSphere.Add<Comp::Mesh>().mMeshId = Editor::Gizmos::nSphereMeshId;
   vertexSphere.Get<Comp::Transform>().SetUniformScale(0.0f);
 
   ao.mName = "ExpandVertexSphere";
@@ -410,19 +430,21 @@ void VertexDescription(Sequence* sequence)
   });
   seq.Wait();
 
-  AssetId fugazId =
-    AssLib::Create<Gfx::Font>("FugazOne", "font/fugazOne/font.ttf");
+  Rsl::Asset& resources = Rsl::AddAsset("TheFundamentalsOfGraphics");
+  ResId fugazId = ResId(resources.GetName(), "FugazOne");
+  resources.InitRes<Gfx::Font>(
+    fugazId.GetResourceName(), "font/fugazOne/font.ttf");
   World::Object vertexLabel = vertexSphere.CreateChild();
   {
     auto& text = vertexLabel.Add<Comp::Text>();
     text.mAlign = Comp::Text::Alignment::Center;
     text.mFillAmount = 0.0f;
+    text.mColor = {1, 1, 1, 1};
     text.mText = "Vertex";
     text.mFontId = fugazId;
     auto& transform = vertexLabel.Get<Comp::Transform>();
     transform.SetTranslation({0.0f, 2.0f, 0.0f});
     transform.SetUniformScale(0.7f);
-    vertexLabel.Add<Comp::AlphaColor>().mColor = {1.0f, 1.0f, 1.0f, 1.0f};
   }
   ao.mName = "ShowVertexLabel";
   ao.mDuration = 0.5f;
@@ -454,8 +476,8 @@ void VertexDescription(Sequence* sequence)
     box.mWidth = 5.0f;
     box.mHeight = 1.25f;
     box.mCenter = boxCenters[i];
-    attributeBoxes[i].Add<Comp::AlphaColor>().mColor = {0.0f, 1.0f, 0.0f, 1.0f};
-    attributeBoxes[i].Get<Comp::Model>().mShaderId = AssLib::nColorShaderId;
+    Rsl::GetRes<Gfx::Material>(attributeBoxes[i].Get<Comp::Mesh>().mMaterialId)
+      .Add<Vec4>("uColor") = {0, 1, 0, 1};
 
     seq.Gap(0.15f);
     ao.mName = "ShowAttributeBox";
@@ -479,10 +501,9 @@ void VertexDescription(Sequence* sequence)
     line.mEnd = finalVertexSpherePosition;
     line.mThickness = 0.14f;
     line.UpdateTransform(attributeConnectors[i]);
-    attributeConnectors[i].Get<Comp::Model>().mShaderId =
-      AssLib::nColorShaderId;
-    attributeConnectors[i].Add<Comp::AlphaColor>().mColor = {
-      1.0f, 1.0f, 1.0f, 1.0f};
+    Rsl::GetRes<Gfx::Material>(
+      attributeConnectors[i].Get<Comp::Mesh>().mMaterialId)
+      .Add<Vec4>("uColor") = {1, 1, 1, 1};
     seq.Gap(0.1f);
     ao.mName = "ExpandConnector";
     ao.mDuration = 1.0f;
@@ -500,12 +521,12 @@ void VertexDescription(Sequence* sequence)
     auto& text = attributeLabel.Add<Comp::Text>();
     text.mFontId = fugazId;
     text.mFillAmount = 0.0f;
+    text.mColor = {1, 1, 1, 1};
     text.mText = "Attributes";
     text.mAlign = Comp::Text::Alignment::Center;
     auto& transform = attributeLabel.Get<Comp::Transform>();
     transform.SetTranslation({6.5f, -0.3f, 0.0f});
     transform.SetUniformScale(0.7f);
-    attributeLabel.Add<Comp::AlphaColor>().mColor = {1.0f, 1.0f, 1.0f, 1.0f};
   }
   ao.mName = "ShowAttributeLabel";
   ao.mDuration = 1.0f;
@@ -529,9 +550,8 @@ void VertexDescription(Sequence* sequence)
     auto& arrow = attributeArrows[i].Add<Arrow>();
     arrow.mStart = arrowStarts[i];
     arrow.mEnd = arrowEnds[i];
-    attributeArrows[i].Add<Comp::AlphaColor>().mColor = {
-      1.0f, 1.0f, 1.0f, 1.0f};
-    attributeArrows[i].Get<Comp::Model>().mShaderId = AssLib::nColorShaderId;
+    Rsl::GetRes<Gfx::Material>(attributeArrows[i].Get<Comp::Mesh>().mMaterialId)
+      .Add<Vec4>("uColor") = {1, 1, 1, 1};
 
     seq.Gap(0.1f);
     ao.mName = "ShowAttributeArrow";
@@ -551,17 +571,21 @@ void VertexDescription(Sequence* sequence)
     auto& transform = attributeFlashes[i].Add<Comp::Transform>();
     transform.SetTranslation(flashCenter);
     transform.SetScale({4.75f / 2.0f, 1.0f / 2.0f, 0.1f});
-    auto& model = attributeFlashes[i].Add<Comp::Model>();
-    model.mModelId = AssLib::nCubeModelId;
-    model.mShaderId = AssLib::nColorShaderId;
-    attributeFlashes[i].Add<Comp::AlphaColor>().mColor = {
-      1.0f, 1.0f, 1.0f, 0.0f};
+    auto& mesh = attributeFlashes[i].Add<Comp::Mesh>();
+    mesh.mMeshId = Editor::Gizmos::nCubeMeshId;
+    mesh.mMaterialId = ResId(resources.GetName(), "Flash" + std::to_string(i));
+    resources
+      .InitRes<Gfx::Material>(
+        mesh.mMaterialId.GetResourceName(), "vres/renderer:Color")
+      .Add<Vec4>("uColor") = {1, 1, 1, 0};
     seq.Gap(0.25f);
     ao.mName = "FlashAttribute";
     ao.mDuration = 1.5f;
     ao.mEase = EaseType::Flash;
     seq.Add(ao, [=](float t) {
-      attributeFlashes[i].Get<Comp::AlphaColor>().mColor[3] = t;
+      Rsl::GetRes<Gfx::Material>(
+        attributeFlashes[i].Get<Comp::Mesh>().mMaterialId)
+        .Get<Vec4>("uColor")[3] = t;
     });
   }
   seq.Wait();
@@ -573,11 +597,11 @@ void VertexDescription(Sequence* sequence)
     text.mText = "Position";
     text.mFontId = fugazId;
     text.mFillAmount = 0.0f;
+    text.mColor = {1, 1, 1, 1};
     text.mAlign = Comp::Text::Alignment::Center;
     auto& transform = positionLabel.Get<Comp::Transform>();
     transform.SetTranslation({0.0f, -0.35f, 0.0f});
     transform.SetUniformScale(0.7f);
-    positionLabel.Add<Comp::AlphaColor>().mColor = {1.0f, 1.0f, 1.0f, 1.0f};
   }
   ao.mName = "ShowPosition";
   ao.mDuration = 0.5f;
@@ -588,14 +612,20 @@ void VertexDescription(Sequence* sequence)
   seq.Wait();
   seq.Gap(1.0f);
 
-  AssetId heartId = AssLib::Create<Gfx::Model>("Heart", "model/heart.obj");
+  ResId heartId(resources.GetName(), "Heart");
+  resources
+    .InitRes<Gfx::Mesh>(heartId.GetResourceName(), "model/heart.obj", false, 1)
+    .Finalize();
   World::Object loveAttributes[2];
   for (int i = 0; i < 2; ++i) {
     loveAttributes[i] = space.CreateObject();
-    auto& model = loveAttributes[i].Add<Comp::Model>();
-    model.mModelId = heartId;
-    model.mShaderId = AssLib::nColorShaderId;
-    loveAttributes[i].Add<Comp::AlphaColor>().mColor = {1.0f, 1.0f, 1.0f, 1.0f};
+    auto& mesh = loveAttributes[i].Add<Comp::Mesh>();
+    mesh.mMeshId = heartId;
+    mesh.mMaterialId = ResId(resources.GetName(), "Heart" + std::to_string(i));
+    resources
+      .InitRes<Gfx::Material>(
+        mesh.mMaterialId.GetResourceName(), "vres/renderer:Color")
+      .Add<Vec4>("uColor") = {1, 1, 1, 1};
     Vec3 translation = boxCenters[i + 1];
     translation[2] = 1.0f;
     auto& transform = loveAttributes[i].Get<Comp::Transform>();
@@ -617,16 +647,20 @@ void VertexDescription(Sequence* sequence)
   ao.mEase = EaseType::QuadIn;
   seq.Add(ao, [=](float t) {
     float newAlpha = 1.0f - t;
+    Ds::Vector<ResId> fadeMatIds;
     for (int i = 0; i < 2; ++i) {
-      attributeConnectors[i + 1].Get<Comp::AlphaColor>().mColor[3] = newAlpha;
-      attributeBoxes[i + 1].Get<Comp::AlphaColor>().mColor[3] = newAlpha;
-      loveAttributes[i].Get<Comp::AlphaColor>().mColor[3] = newAlpha;
+      fadeMatIds.Push(attributeConnectors[i].Get<Comp::Mesh>().mMaterialId);
+      fadeMatIds.Push(attributeBoxes[i].Get<Comp::Mesh>().mMaterialId);
+      fadeMatIds.Push(loveAttributes[i].Get<Comp::Mesh>().mMaterialId);
     }
     for (int i = 0; i < 3; ++i) {
-      attributeArrows[i].Get<Comp::AlphaColor>().mColor[3] = newAlpha;
+      fadeMatIds.Push(attributeArrows[i].Get<Comp::Mesh>().mMaterialId);
     }
-    attributeLabel.Get<Comp::AlphaColor>().mColor[3] = newAlpha;
-    vertexLabel.Get<Comp::AlphaColor>().mColor[3] = newAlpha;
+    for (const ResId& fadeMatId : fadeMatIds) {
+      Rsl::GetRes<Gfx::Material>(fadeMatId).Get<Vec4>("uColor")[3] = newAlpha;
+    }
+    attributeLabel.Get<Comp::Text>().mColor[3] = newAlpha;
+    vertexLabel.Get<Comp::Text>().mColor[3] = newAlpha;
     vertexBracket.Get<Bracket>().ChangeColor(
       vertexBracket, {1.0f, 1.0f, 1.0f, newAlpha});
   });
@@ -640,7 +674,7 @@ void VertexDescription(Sequence* sequence)
       attributeConnectors[i + 1].Get<Line>().Show(
         attributeConnectors[i + 1], visible);
       attributeBoxes[i + 1].Get<Box>().Show(attributeBoxes[i + 1], visible);
-      loveAttributes[i].Get<Comp::Model>().mVisible = visible;
+      loveAttributes[i].Get<Comp::Mesh>().mVisible = visible;
     }
     for (int i = 0; i < 3; ++i) {
       attributeArrows[i].Get<Arrow>().Show(attributeArrows[i], visible);
@@ -704,12 +738,12 @@ void VertexDescription(Sequence* sequence)
   text->mWidth = 0.0f;
   text->mAlign = Comp::Text::Alignment::Right;
   text->mFillAmount = 0.0f;
+  text->mColor = {1, 1, 1, 1};
   text->mText = "2D";
   text->mFontId = fugazId;
   transform = &table2dLabel.Get<Comp::Transform>();
   transform->SetTranslation({-3.0f, -0.3f, 0.0f});
   transform->SetUniformScale(0.7f);
-  table2dLabel.Add<Comp::AlphaColor>().mColor = {1.0f, 1.0f, 1.0f, 1.0f};
 
   ao.mName = "Show2dLabel";
   ao.mDuration = 0.5f;
@@ -757,11 +791,11 @@ void VertexDescription(Sequence* sequence)
   text->mAlign = Comp::Text::Alignment::Right;
   text->mFillAmount = 0.0f;
   text->mText = "3D";
+  text->mColor = {1, 1, 1, 1};
   text->mFontId = fugazId;
   transform = &table3dLabel.Get<Comp::Transform>();
   transform->SetTranslation({-3.0f, -0.3f, 0.0f});
   transform->SetUniformScale(0.7f);
-  table3dLabel.Add<Comp::AlphaColor>().mColor = {1.0f, 1.0f, 1.0f, 1.0f};
 
   ao.mName = "Show3DLabel";
   ao.mDuration = 0.5f;
@@ -778,7 +812,7 @@ void VertexDescription(Sequence* sequence)
     float newAlpha = 1.0f - t;
     positionTable2d.Get<Table>().Fade(positionTable2d, newAlpha);
     table2dBracket.Get<Bracket>().Fade(table2dBracket, newAlpha);
-    table2dLabel.Get<Comp::AlphaColor>().mColor[3] = newAlpha;
+    table2dLabel.Get<Comp::Text>().mColor[3] = newAlpha;
   });
   seq.Wait();
 

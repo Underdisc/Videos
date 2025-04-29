@@ -1,1 +1,3 @@
-target_sources(${targetName} PRIVATE Sequence.cc Main.cc)
+target_sources(${targetName} PRIVATE
+  Main.cc
+  Sequence.cc)
