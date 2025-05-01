@@ -1,0 +1,54 @@
+There a lot of steps that we need to take before putting something is on the screen.
+
+One of those steps involves creating a vertex buffer.
+
+If there is anything that I would call "the what" of graphics programming, it would definitely be this [vertex buffer].
+
+It's where the data contained in that model you made in made in Blender will be placed before being used to render an image on your GPU.
+
+If you're asking "What data is contained in the vertex buffer?" You're in luck, because that's the first thing to talk about.
+
+Simply put, a vertex buffer is just large array. We create it on the CPU and send to the GPU.
+
+It might already be obvious, but an element of this array is called a vertex.
+
+In a vertex, we store discrete types of data.
+
+These discrete types are referred to as attributes.
+
+If you're new to this, that might be a bit much to take in, so please, feel free to pause just to get familiar with this heiarchy of data, because it's very central to graphics programming.
+
+What really defines a vertex is its attributes and it's entirely up to the programmer what those attributes are, or, more accurately, represent.
+
+But, even though it's the programmer's choice, certain types of attributes are just ubiquitous.
+
+There's one particular attribute that is so ubiquitous, it would surpise me to see a vertex without it.
+
+We'll refer to it as the position attribute.
+
+Other attributes are loved and are very important for a good deal of rendering techniques, but none of them really come close to the god-like nature of the position attribute, so we're not going to talk about them now.
+
+For this video, we'll say that the position attribute has 3 values: an x, y, and z coordinate. Do note, it doesn't need to be 3 values, but I digress.
+
+These values collectively represent the location of a vertex.
+
+If we consider a vertex to only contain a position attribute, then the array of vertices that make up our vertex buffer is really just an array of positions. 
+
+This is what we'll think of as the vertex buffer for the remainder of this video: just an array of 3D positions.
+
+Let's pack up that array and send it off to the GPU so we can...render it?
+
+There are a lot of steps involved in rendering and these steps are collectively referred to as the graphics pipeline.
+
+
+
+
+
+
+
+
+
+
+
+
+

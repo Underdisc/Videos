@@ -1,3 +1,6 @@
+#ifndef TheFundamentalsOfGraphics_h
+#define TheFundamentalsOfGraphics_h
+
 #include <comp/Camera.h>
 #include <comp/LineMesh.h>
 #include <comp/Relationship.h>
@@ -11,7 +14,7 @@
 #include <rsl/Library.h>
 #include <world/World.h>
 
-#include "Sequence.h"
+#include "../Sequence.h"
 
 struct Line
 {
@@ -842,3 +845,5 @@ Sequence TheFundamentalsOfGraphics()
   VertexDescription(&seq);
   return seq;
 }
+
+#endif

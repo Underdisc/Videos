@@ -22,7 +22,7 @@
 #include <world/Registrar.h>
 #include <world/World.h>
 
-#include "TheFundamentalsOfGraphics.h"
+#include "TheFundamentalsOfGraphics/Sequence.h"
 
 Sequence gSeq;
 void CentralUpdate()
