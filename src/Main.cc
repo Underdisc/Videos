@@ -12,6 +12,7 @@
 #include <debug/Draw.h>
 #include <ds/Vector.h>
 #include <editor/Editor.h>
+#include <editor/LayerInterface.h>
 #include <gfx/Font.h>
 #include <imgui/imgui.h>
 #include <math.h>
@@ -23,25 +24,27 @@
 
 #include "TheFundamentalsOfGraphics.h"
 
-Sequence gSequence;
+Sequence gSeq;
 void CentralUpdate()
 {
-  if (Input::KeyPressed(Input::Key::Space)) {
-    if (gSequence.mStatus == Sequence::Status::Play) {
-      gSequence.Pause();
-    } else {
-      gSequence.Play();
-    }
+  gSeq.Update(Temporal::DeltaTime());
+}
+
+void EditorExtension()
+{
+  if (gSeq.mEvents.Empty()) {
+    gSeq = TheFundamentalsOfGraphics();
+    Editor::nCoreInterface.OpenInterface<Editor::LayerInterface>(
+      World::nLayers.Back());
   }
-  gSequence.Update(Temporal::DeltaTime());
 
   ImGui::Begin("Sequence");
-  float time = gSequence.mTimePassed;
+  float time = gSeq.mTimePassed;
   ImGui::PushItemWidth(-1.0f);
-  ImGui::SliderFloat("Time", &time, 0.0f, gSequence.mTotalTime);
-  if (time != gSequence.mTimePassed) {
-    gSequence.Pause();
-    gSequence.Scrub(time);
+  ImGui::SliderFloat("Time", &time, 0.0f, gSeq.mTotalTime);
+  if (time != gSeq.mTimePassed) {
+    World::nPause = true;
+    gSeq.Scrub(time);
   }
   ImGui::End();
 }
@@ -72,9 +75,8 @@ int main(int argc, char* argv[])
   Result result = VarkorInit(argc, argv, std::move(config));
   LogAbortIf(!result.Success(), result.mError.c_str());
 
-  TheFundamentalsOfGraphics(&gSequence);
   World::nCentralUpdate = CentralUpdate;
+  Editor::nExtension = EditorExtension;
   VarkorRun();
-
   VarkorPurge();
 }

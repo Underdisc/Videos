@@ -26,11 +26,6 @@ float Ease(float t, EaseType easeType);
 struct Sequence
 {
   Sequence();
-  enum class Status
-  {
-    Play,
-    Pause
-  };
 
   struct Event
   {
@@ -64,7 +59,6 @@ struct Sequence
   float mTimePassed;
   // The total duration of the sequence.
   float mTotalTime;
-  Status mStatus;
   unsigned int mNextInactiveEvent;
   Ds::Vector<Event> mEvents;
   Ds::Vector<unsigned int> mActiveEvents;

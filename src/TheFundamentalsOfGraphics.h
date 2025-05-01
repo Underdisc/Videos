@@ -339,7 +339,8 @@ struct Table
 void VertexDescription(Sequence* sequence)
 {
   Sequence& seq = *sequence;
-  World::LayerIt layerIt = World::CreateTopLayer();
+  World::LayerIt layerIt =
+    World::nLayers.EmplaceBack("TheFundamentalsOfGraphics");
   World::Space& space = layerIt->mSpace;
   World::Object camera = space.CreateObject();
   Comp::Camera& cameraComp = camera.Add<Comp::Camera>();
@@ -835,7 +836,9 @@ void VertexDescription(Sequence* sequence)
   });
 }
 
-void TheFundamentalsOfGraphics(Sequence* sequence)
+Sequence TheFundamentalsOfGraphics()
 {
-  VertexDescription(sequence);
+  Sequence seq;
+  VertexDescription(&seq);
+  return seq;
 }

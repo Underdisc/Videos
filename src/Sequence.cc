@@ -2,6 +2,9 @@
 
 #include "Sequence.h"
 
+Sequence::Sequence(): mTimePassed(0.0f), mTotalTime(0.0f), mNextInactiveEvent(0)
+{}
+
 float Ease(float t, EaseType easeType)
 {
   switch (easeType) {
@@ -44,13 +47,6 @@ void Sequence::Event::Run(float t) const
   }
 }
 
-Sequence::Sequence():
-  mStatus(Status::Pause),
-  mTimePassed(0.0f),
-  mTotalTime(0.0f),
-  mNextInactiveEvent(0)
-{}
-
 void Sequence::Add(const AddOptions& ao, std::function<void(float t)> function)
 {
   Event newEvent;
@@ -87,16 +83,6 @@ void Sequence::Wait()
   Gap(mEvents.Top().mEndTime - mEvents.Top().mStartTime);
 }
 
-void Sequence::Play()
-{
-  mStatus = Status::Play;
-}
-
-void Sequence::Pause()
-{
-  mStatus = Status::Pause;
-}
-
 bool Sequence::AtEnd()
 {
   return mNextInactiveEvent == mEvents.Size() && mActiveEvents.Size() == 0;
@@ -104,7 +90,7 @@ bool Sequence::AtEnd()
 
 void Sequence::Update(float dt)
 {
-  if (AtEnd() || mStatus == Status::Pause) {
+  if (AtEnd()) {
     return;
   }
   ScrubUp(mTimePassed + dt);
