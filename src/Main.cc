@@ -25,13 +25,11 @@
 #include "TheFundamentalsOfGraphics/Sequence.h"
 
 Sequence gSeq;
-void CentralUpdate()
-{
+void CentralUpdate() {
   gSeq.Update(Temporal::DeltaTime());
 }
 
-void EditorExtension()
-{
+void EditorExtension() {
   if (gSeq.mEvents.Empty()) {
     gSeq = TheFundamentalsOfGraphics();
     Editor::nCoreInterface.OpenInterface<Editor::LayerInterface>(
@@ -49,8 +47,7 @@ void EditorExtension()
   ImGui::End();
 }
 
-void RegisterTypes()
-{
+void RegisterTypes() {
   using namespace Comp;
   RegisterComponent(Line);
   RegisterDependencies(Line, Mesh);
@@ -64,8 +61,7 @@ void RegisterTypes()
   RegisterDependencies(Table, Transform);
 }
 
-int main(int argc, char* argv[])
-{
+int main(int argc, char* argv[]) {
   Registrar::nRegisterCustomTypes = RegisterTypes;
 
   Options::Config config;

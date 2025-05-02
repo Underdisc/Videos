@@ -2,11 +2,10 @@
 
 #include "Sequence.h"
 
-Sequence::Sequence(): mTimePassed(0.0f), mTotalTime(0.0f), mNextInactiveEvent(0)
-{}
+Sequence::Sequence():
+  mTimePassed(0.0f), mTotalTime(0.0f), mNextInactiveEvent(0) {}
 
-float Ease(float t, EaseType easeType)
-{
+float Ease(float t, EaseType easeType) {
   switch (easeType) {
   case EaseType::Linear: break;
   case EaseType::QuadIn:
@@ -17,7 +16,8 @@ float Ease(float t, EaseType easeType)
   case EaseType::QuadOutIn:
     if (t < 0.5f) {
       t = 2 * t * t;
-    } else {
+    }
+    else {
       t = t - 1.0f;
       t = 1.0f - 2 * t * t;
     }
@@ -39,21 +39,21 @@ float Ease(float t, EaseType easeType)
   return t;
 }
 
-void Sequence::Event::Run(float t) const
-{
+void Sequence::Event::Run(float t) const {
   t = Ease(t, mEase);
   if (mFunction) {
     mFunction(t);
   }
 }
 
-void Sequence::Add(const AddOptions& ao, std::function<void(float t)> function)
-{
+void Sequence::Add(
+  const AddOptions& ao, std::function<void(float t)> function) {
   Event newEvent;
   newEvent.mName = ao.mName;
   if (mEvents.Size() == 0) {
     newEvent.mStartTime = 0.0f;
-  } else {
+  }
+  else {
     newEvent.mStartTime = mEvents.Top().mStartTime;
   }
   newEvent.mEndTime = newEvent.mStartTime + ao.mDuration;
@@ -63,13 +63,13 @@ void Sequence::Add(const AddOptions& ao, std::function<void(float t)> function)
   mTotalTime = newEvent.mEndTime;
 }
 
-void Sequence::Gap(float duration)
-{
+void Sequence::Gap(float duration) {
   Event newEvent;
   newEvent.mName = "Gap";
   if (mEvents.Size() == 0) {
     newEvent.mStartTime = duration;
-  } else {
+  }
+  else {
     newEvent.mStartTime = mEvents.Top().mStartTime + duration;
   }
   newEvent.mEndTime = newEvent.mStartTime;
@@ -77,27 +77,23 @@ void Sequence::Gap(float duration)
   mTotalTime = newEvent.mEndTime;
 }
 
-void Sequence::Wait()
-{
+void Sequence::Wait() {
   LogAbortIf(mEvents.Size() == 0, "One existing event required to wait.");
   Gap(mEvents.Top().mEndTime - mEvents.Top().mStartTime);
 }
 
-bool Sequence::AtEnd()
-{
+bool Sequence::AtEnd() {
   return mNextInactiveEvent == mEvents.Size() && mActiveEvents.Size() == 0;
 }
 
-void Sequence::Update(float dt)
-{
+void Sequence::Update(float dt) {
   if (AtEnd()) {
     return;
   }
   ScrubUp(mTimePassed + dt);
 }
 
-void Sequence::ScrubUp(float time)
-{
+void Sequence::ScrubUp(float time) {
   // Activate any events that haven't started.
   while (mNextInactiveEvent < mEvents.Size()) {
     const Event& event = mEvents[mNextInactiveEvent];
@@ -115,7 +111,8 @@ void Sequence::ScrubUp(float time)
       event.Run(1.0f);
       mActiveEvents.Remove(i);
       --i;
-    } else {
+    }
+    else {
       float eventDuration = event.mEndTime - event.mStartTime;
       float passedDuration = time - event.mStartTime;
       float t = passedDuration / eventDuration;
@@ -125,13 +122,13 @@ void Sequence::ScrubUp(float time)
 
   if (AtEnd()) {
     mTimePassed = mTotalTime;
-  } else {
+  }
+  else {
     mTimePassed = time;
   }
 }
 
-void Sequence::ScrubDown(float time)
-{
+void Sequence::ScrubDown(float time) {
   // Put all events that haven't started at their starting position.
   mActiveEvents.Clear();
   for (int i = mNextInactiveEvent - 1; i >= 0; --i) {
@@ -156,16 +153,17 @@ void Sequence::ScrubDown(float time)
   }
   if (time < 0.0f) {
     mTimePassed = 0.0f;
-  } else {
+  }
+  else {
     mTimePassed = time;
   }
 }
 
-void Sequence::Scrub(float time)
-{
+void Sequence::Scrub(float time) {
   if (time > mTimePassed) {
     ScrubUp(time);
-  } else {
+  }
+  else {
     ScrubDown(time);
   }
 }

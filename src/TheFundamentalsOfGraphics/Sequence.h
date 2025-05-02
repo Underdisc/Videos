@@ -16,14 +16,12 @@
 
 #include "../Sequence.h"
 
-struct Line
-{
+struct Line {
   float mThickness;
   Vec3 mStart;
   Vec3 mEnd;
 
-  void VInit(const World::Object& owner)
-  {
+  void VInit(const World::Object& owner) {
     static Rsl::Asset& lines = Rsl::AddAsset("Lines");
     static int lineCount = 0;
     std::string resName = std::to_string(lineCount++);
@@ -37,8 +35,7 @@ struct Line
     mEnd = {0.0f, 0.0f, 0.0f};
   }
 
-  void UpdateTransform(const World::Object& owner)
-  {
+  void UpdateTransform(const World::Object& owner) {
     Comp::Transform& transform = owner.Get<Comp::Transform>();
     Vec3 direction = mEnd - mStart;
     float directionMag = Math::Magnitude(direction);
@@ -53,26 +50,22 @@ struct Line
     transform.SetTranslation(mStart + direction / 2.0f);
   }
 
-  void SetStart(const Vec3& start, const World::Object& owner)
-  {
+  void SetStart(const Vec3& start, const World::Object& owner) {
     mStart = start;
     UpdateTransform(owner);
   }
 
-  void SetEnd(const Vec3& end, const World::Object& owner)
-  {
+  void SetEnd(const Vec3& end, const World::Object& owner) {
     mEnd = end;
     UpdateTransform(owner);
   }
 
-  void Show(const World::Object& owner, bool visible)
-  {
+  void Show(const World::Object& owner, bool visible) {
     owner.Get<Comp::Mesh>().mVisible = visible;
   }
 };
 
-struct Bracket
-{
+struct Bracket {
   Vec3 mCenter;
   // The extent to the right side of the bracket from the center.
   Vec3 mExtent;
@@ -81,8 +74,7 @@ struct Bracket
   World::MemberId mLeftChild;
   World::MemberId mRightChild;
 
-  void VInit(const World::Object& owner)
-  {
+  void VInit(const World::Object& owner) {
     static Rsl::Asset& brackets = Rsl::AddAsset("Brackets");
     static int bracketCount = 0;
     std::string resName = std::to_string(bracketCount++);
@@ -112,13 +104,11 @@ struct Bracket
     Fill(owner, 0.0f);
   }
 
-  void ChangeColor(const World::Object& owner, const Vec4& color)
-  {
+  void ChangeColor(const World::Object& owner, const Vec4& color) {
     Rsl::GetRes<Gfx::Material>(mMaterialId).Get<Vec4>("uColor") = color;
   }
 
-  void Fill(const World::Object& owner, float fill)
-  {
+  void Fill(const World::Object& owner, float fill) {
     Ds::Vector<Vec3> points;
     points.Push({0.0f, 0.3f, 0.0f});
     points.Push({0.0f, 0.0f, 0.0f});
@@ -141,26 +131,22 @@ struct Bracket
     transform.SetTranslation(mCenter);
   }
 
-  void Show(const World::Object& owner, bool visible)
-  {
+  void Show(const World::Object& owner, bool visible) {
     owner.mSpace->Get<Comp::Mesh>(mLeftChild).mVisible = visible;
     owner.mSpace->Get<Comp::Mesh>(mRightChild).mVisible = visible;
   }
 
-  void Fade(const World::Object& owner, float newAlpha)
-  {
+  void Fade(const World::Object& owner, float newAlpha) {
     Rsl::GetRes<Gfx::Material>(mMaterialId).Get<Vec4>("uColor")[3] = newAlpha;
   }
 };
 
-struct Box
-{
+struct Box {
   Vec3 mCenter;
   float mWidth;
   float mHeight;
 
-  void VInit(const World::Object& owner)
-  {
+  void VInit(const World::Object& owner) {
     static Rsl::Asset& boxes = Rsl::AddAsset("Boxes");
     static int boxCount = 0;
     std::string resName = std::to_string(boxCount++);
@@ -174,8 +160,7 @@ struct Box
     Fill(owner, 0.0f);
   }
 
-  void Fill(const World::Object& owner, float fill)
-  {
+  void Fill(const World::Object& owner, float fill) {
     float halfHeight = mHeight / 2.0f;
     float halfWidth = mWidth / 2.0f;
     float thickness = 0.2f;
@@ -198,19 +183,16 @@ struct Box
     owner.Get<Comp::Transform>().SetTranslation(mCenter);
   }
 
-  void Show(const World::Object& owner, bool visible)
-  {
+  void Show(const World::Object& owner, bool visible) {
     owner.Get<Comp::Mesh>().mVisible = visible;
   }
 };
 
-struct Arrow
-{
+struct Arrow {
   Vec3 mStart;
   Vec3 mEnd;
 
-  void VInit(const World::Object& owner)
-  {
+  void VInit(const World::Object& owner) {
     static Rsl::Asset& arrows = Rsl::AddAsset("Arrows");
     static int arrowCount = 0;
     std::string resName = std::to_string(arrowCount++);
@@ -224,8 +206,7 @@ struct Arrow
     Fill(owner, 0.0f);
   }
 
-  void Fill(const World::Object& owner, float fill)
-  {
+  void Fill(const World::Object& owner, float fill) {
     Ds::Vector<Vec3> points;
     points.Push(mStart);
     points.Push(mEnd);
@@ -238,22 +219,19 @@ struct Arrow
       TerminalType::Arrow);
   }
 
-  void Show(const World::Object& owner, bool visible)
-  {
+  void Show(const World::Object& owner, bool visible) {
     owner.Get<Comp::Mesh>().mVisible = visible;
   }
 };
 
-struct Table
-{
+struct Table {
   Vec3 mCenter;
   float mCellWidth;
   float mCellHeight;
   unsigned int mCount;
   float mThickness;
 
-  void VInit(const World::Object& owner)
-  {
+  void VInit(const World::Object& owner) {
     mCenter = {0.0f, 0.0f, 0.0f};
     mCellWidth = 2.0f;
     mCellHeight = 1.0f;
@@ -262,18 +240,15 @@ struct Table
     Fill(owner, 0.0f);
   }
 
-  float Height()
-  {
+  float Height() {
     return mCellHeight * mCount - (mCount - 1) * mThickness;
   }
 
-  float Width()
-  {
+  float Width() {
     return mCellWidth;
   }
 
-  void Fill(const World::Object& owner, float fill)
-  {
+  void Fill(const World::Object& owner, float fill) {
     owner.Get<Comp::Transform>().SetTranslation(mCenter);
 
     // Make sure the parent has the correct number of children.
@@ -319,8 +294,7 @@ struct Table
     }
   }
 
-  void Show(const World::Object& owner, bool visible)
-  {
+  void Show(const World::Object& owner, bool visible) {
     const auto& relationship = owner.Get<Comp::Relationship>();
     for (int i = 0; i < (int)relationship.mChildren.Size(); ++i) {
       owner.mSpace->Get<Comp::Mesh>(relationship.mChildren[i]).mVisible =
@@ -328,10 +302,9 @@ struct Table
     }
   }
 
-  void Fade(const World::Object& owner, float newAlpha)
-  {
+  void Fade(const World::Object& owner, float newAlpha) {
     const auto& relationship = owner.Get<Comp::Relationship>();
-    for (World::MemberId childId : relationship.mChildren) {
+    for (World::MemberId childId: relationship.mChildren) {
       const World::Object& child = World::Object(owner.mSpace, childId);
       Rsl::GetRes<Gfx::Material>(child.Get<Comp::Mesh>().mMaterialId)
         .Get<Vec4>("uColor")[3] = newAlpha;
@@ -339,8 +312,7 @@ struct Table
   }
 };
 
-void VertexDescription(Sequence* sequence)
-{
+void VertexDescription(Sequence* sequence) {
   Sequence& seq = *sequence;
   World::LayerIt layerIt =
     World::nLayers.EmplaceBack("TheFundamentalsOfGraphics");
@@ -660,7 +632,7 @@ void VertexDescription(Sequence* sequence)
     for (int i = 0; i < 3; ++i) {
       fadeMatIds.Push(attributeArrows[i].Get<Comp::Mesh>().mMaterialId);
     }
-    for (const ResId& fadeMatId : fadeMatIds) {
+    for (const ResId& fadeMatId: fadeMatIds) {
       Rsl::GetRes<Gfx::Material>(fadeMatId).Get<Vec4>("uColor")[3] = newAlpha;
     }
     attributeLabel.Get<Comp::Text>().mColor[3] = newAlpha;
@@ -839,8 +811,7 @@ void VertexDescription(Sequence* sequence)
   });
 }
 
-Sequence TheFundamentalsOfGraphics()
-{
+Sequence TheFundamentalsOfGraphics() {
   Sequence seq;
   VertexDescription(&seq);
   return seq;

@@ -6,13 +6,11 @@
 #include <string>
 
 template<typename T>
-T Interpolate(const T& start, const T& end, float t)
-{
+T Interpolate(const T& start, const T& end, float t) {
   return (1.0f - t) * start + t * end;
 }
 
-enum class EaseType
-{
+enum class EaseType {
   Linear,
   QuadIn,
   QuadOut,
@@ -23,12 +21,10 @@ enum class EaseType
 };
 float Ease(float t, EaseType easeType);
 
-struct Sequence
-{
+struct Sequence {
   Sequence();
 
-  struct Event
-  {
+  struct Event {
     std::string mName;
     float mStartTime;
     float mEndTime;
@@ -37,8 +33,7 @@ struct Sequence
     void Run(float t) const;
   };
 
-  struct AddOptions
-  {
+  struct AddOptions {
     std::string mName;
     float mDuration;
     EaseType mEase;
