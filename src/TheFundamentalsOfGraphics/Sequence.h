@@ -3,6 +3,7 @@
 
 #include <comp/Camera.h>
 #include <comp/LineMesh.h>
+#include <comp/Mesh.h>
 #include <comp/Relationship.h>
 #include <comp/Text.h>
 #include <comp/Transform.h>
