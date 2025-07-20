@@ -19,7 +19,7 @@
 #include <world/World.h>
 
 #include "QuickHull.h"
-#include "Sequence.h"
+#include "Video.h"
 
 Video gVid;
 void CentralUpdate() {

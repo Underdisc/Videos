@@ -15,7 +15,7 @@
 #include <rsl/Library.h>
 #include <world/World.h>
 
-#include "../Sequence.h"
+#include "../Video.h"
 
 struct Line {
   float mThickness;

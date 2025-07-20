@@ -3,7 +3,7 @@
 
 #include <Result.h>
 
-#include "Sequence.h"
+#include "Video.h"
 
 Result QuickHull(Video* video);
 
