@@ -4,6 +4,7 @@
 #include <ds/Vector.h>
 #include <functional>
 #include <string>
+#include <world/World.h>
 
 template<typename T>
 T Interpolate(const T& start, const T& end, float t) {
@@ -57,6 +58,12 @@ struct Sequence {
   unsigned int mNextInactiveEvent;
   Ds::Vector<Event> mEvents;
   Ds::Vector<unsigned int> mActiveEvents;
+};
+
+struct Video {
+  std::string mName;
+  World::LayerIt mLayerIt;
+  Sequence mSeq;
 };
 
 #endif

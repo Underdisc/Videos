@@ -1,14 +1,10 @@
-// Varkor Commit Hash: b2fb779
-
 #include <Input.h>
 #include <Result.h>
 #include <Temporal.h>
 #include <VarkorMain.h>
 #include <comp/AlphaColor.h>
-#include <comp/Camera.h>
 #include <comp/Mesh.h>
 #include <comp/Text.h>
-#include <comp/Transform.h>
 #include <debug/Draw.h>
 #include <ds/Vector.h>
 #include <editor/Editor.h>
@@ -22,48 +18,27 @@
 #include <world/Registrar.h>
 #include <world/World.h>
 
-#include "TheFundamentalsOfGraphics/Sequence.h"
+#include "QuickHull.h"
+#include "Sequence.h"
 
-Sequence gSeq;
+Video gVid;
 void CentralUpdate() {
-  gSeq.Update(Temporal::DeltaTime());
+  gVid.mSeq.Update(Temporal::DeltaTime());
 }
 
 void EditorExtension() {
-  if (gSeq.mEvents.Empty()) {
-    gSeq = TheFundamentalsOfGraphics();
-    Editor::nCoreInterface.OpenInterface<Editor::LayerInterface>(
-      World::nLayers.Back());
-  }
-
   ImGui::Begin("Sequence");
-  float time = gSeq.mTimePassed;
+  float time = gVid.mSeq.mTimePassed;
   ImGui::PushItemWidth(-1.0f);
-  ImGui::SliderFloat("Time", &time, 0.0f, gSeq.mTotalTime);
-  if (time != gSeq.mTimePassed) {
+  ImGui::SliderFloat("Time", &time, 0.0f, gVid.mSeq.mTotalTime);
+  if (time != gVid.mSeq.mTimePassed) {
     World::nPause = true;
-    gSeq.Scrub(time);
+    gVid.mSeq.Scrub(time);
   }
   ImGui::End();
 }
 
-void RegisterTypes() {
-  using namespace Comp;
-  RegisterComponent(Line);
-  RegisterDependencies(Line, Mesh);
-  RegisterComponent(Bracket);
-  RegisterDependencies(Bracket, Transform);
-  RegisterComponent(Box);
-  RegisterDependencies(Box, Mesh);
-  RegisterComponent(Arrow);
-  RegisterDependencies(Arrow, Mesh);
-  RegisterComponent(Table);
-  RegisterDependencies(Table, Transform);
-}
-
 int main(int argc, char* argv[]) {
-  Registrar::nRegisterCustomTypes = RegisterTypes;
-
   Options::Config config;
   config.mEditorLevel = Options::EditorLevel::Complete;
   config.mProjectDirectory = PROJECT_DIRECTORY;
@@ -71,6 +46,8 @@ int main(int argc, char* argv[]) {
   Result result = VarkorInit(argc, argv, std::move(config));
   LogAbortIf(!result.Success(), result.mError.c_str());
 
+  result = QuickHull(&gVid);
+  LogAbortIf(!result.Success(), result.mError.c_str());
   World::nCentralUpdate = CentralUpdate;
   Editor::nExtension = EditorExtension;
   VarkorRun();
