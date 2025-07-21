@@ -233,21 +233,21 @@ Result Hull::QuickHull(const Ds::Vector<Vec3>& points, Video* vid) {
     [&](
       const Vec3& point,
       Ds::HashMap<Ds::List<Face>::Iter, ConflictList>& faceConflictLists) {
-    float minDist = FLT_MAX;
-    auto bestFaceConflictListIt = faceConflictLists.end();
-    auto faceContlictListIt = faceConflictLists.begin();
-    while (faceContlictListIt != faceConflictLists.end()) {
-      float dist = faceContlictListIt->mValue.mPlane.Distance(point);
-      if (dist > epsilon && dist < minDist) {
-        minDist = dist;
-        bestFaceConflictListIt = faceContlictListIt;
+      float minDist = FLT_MAX;
+      auto bestFaceConflictListIt = faceConflictLists.end();
+      auto faceContlictListIt = faceConflictLists.begin();
+      while (faceContlictListIt != faceConflictLists.end()) {
+        float dist = faceContlictListIt->mValue.mPlane.Distance(point);
+        if (dist > epsilon && dist < minDist) {
+          minDist = dist;
+          bestFaceConflictListIt = faceContlictListIt;
+        }
+        ++faceContlictListIt;
       }
-      ++faceContlictListIt;
-    }
-    if (bestFaceConflictListIt != faceConflictLists.end()) {
-      bestFaceConflictListIt->mValue.mPoints.Push({point, minDist});
-    }
-  };
+      if (bestFaceConflictListIt != faceConflictLists.end()) {
+        bestFaceConflictListIt->mValue.mPoints.Push({point, minDist});
+      }
+    };
 
   // We only use unique points to define the hull. Equivalent points can
   // potentially be added to the hull multiple times, resulting in a degenerate
@@ -313,22 +313,22 @@ Result Hull::QuickHull(const Ds::Vector<Vec3>& points, Video* vid) {
     Ds::Vector<Ds::List<Face>::Iter> visitedFaces;
     std::function<void(Ds::List<HalfEdge>::CIter)> visitEdge =
       [&](Ds::List<HalfEdge>::CIter edge) {
-      if (visitedFaces.Contains(edge->mFace)) {
-        return;
-      }
-      visitedFaces.Push(edge->mFace);
-      Ds::List<HalfEdge>::CIter currentEdge = edge;
-      do {
-        Ds::List<HalfEdge>::Iter twin = currentEdge->mTwin;
-        Math::Plane twinPlane = twin->mFace->Plane();
-        if (twinPlane.HalfSpaceContains(newPoint, epsilon)) {
-          horizon.Push(twin);
+        if (visitedFaces.Contains(edge->mFace)) {
+          return;
         }
-        else {
-          visitEdge(twin);
-        }
-      } while ((currentEdge = currentEdge->mNext) != edge);
-    };
+        visitedFaces.Push(edge->mFace);
+        Ds::List<HalfEdge>::CIter currentEdge = edge;
+        do {
+          Ds::List<HalfEdge>::Iter twin = currentEdge->mTwin;
+          Math::Plane twinPlane = twin->mFace->Plane();
+          if (twinPlane.HalfSpaceContains(newPoint, epsilon)) {
+            horizon.Push(twin);
+          }
+          else {
+            visitEdge(twin);
+          }
+        } while ((currentEdge = currentEdge->mNext) != edge);
+      };
     visitEdge(bestFaceConflictListIt->Key()->mHalfEdge);
 
     // We create a new vertex for each horizon vertex because it makes deleting
@@ -360,8 +360,8 @@ Result Hull::QuickHull(const Ds::Vector<Vec3>& points, Video* vid) {
       newVertex->mHalfEdge = newEdges[0];
       nhVert->mHalfEdge = newEdges[1];
 
-      // Ensure that all edges referencing to the old horizon vertex reference
-      // the new horizon vertex.
+      // Ensure that all edges referencing the old horizon vertex reference the
+      // new horizon vertex.
       Ds::List<HalfEdge>::Iter currentOldVertEdge = hEdge;
       do {
         currentOldVertEdge->mVertex = nhVert;
@@ -410,21 +410,24 @@ Result Hull::QuickHull(const Ds::Vector<Vec3>& points, Video* vid) {
     // Delete dead vertices, edges, faces, and conflict lists that were covered
     // by the new faces.
     Ds::Vector<Ds::List<Vertex>::Iter> deadVerts;
+    Ds::Vector<Ds::List<HalfEdge>::Iter> deadEdges;
     for (const Ds::List<Face>::Iter& faceIt: visitedFaces) {
       Ds::List<HalfEdge>::Iter currentEdge = faceIt->mHalfEdge;
       do {
         if (!deadVerts.Contains(currentEdge->mVertex)) {
           deadVerts.Push(currentEdge->mVertex);
         }
-        Ds::List<HalfEdge>::Iter nextEdge = currentEdge->mNext;
-        hull.mHalfEdges.Erase(currentEdge);
-        currentEdge = nextEdge;
+        deadEdges.Push(currentEdge);
+        currentEdge = currentEdge->mNext;
       } while (currentEdge != faceIt->mHalfEdge);
       tryRemoveFaceConflictList(faceIt);
       hull.mFaces.Erase(faceIt);
     }
     for (const Ds::List<Vertex>::Iter& vertIt: deadVerts) {
       hull.mVertices.Erase(vertIt);
+    }
+    for (const Ds::List<HalfEdge>::Iter& edgeIt: deadEdges) {
+      hull.mHalfEdges.Erase(edgeIt);
     }
 
     // We now need to merge faces that are coplanar. We only need to check
@@ -447,6 +450,8 @@ Result Hull::QuickHull(const Ds::Vector<Vec3>& points, Video* vid) {
     // As we merge faces, topological errors can arise. If only two edges emerge
     // from a vertex, we have a topological error. Every vertex needs to have 3
     // edges to make it be a part of the volume.
+    Ds::Vector<Ds::List<Vertex>::Iter> mergedVerts;
+    Ds::Vector<Ds::List<HalfEdge>::Iter> mergedEdges;
     auto ensureValidVertex = [&](Ds::List<Vertex>::Iter vertex) {
       int vertexEdgeCount = 0;
       Ds::Vector<Ds::List<HalfEdge>::Iter> vertexEdges;
@@ -504,13 +509,13 @@ Result Hull::QuickHull(const Ds::Vector<Vec3>& points, Video* vid) {
         tryRemovePossibleMerge(edges[1]);
         tryRemovePossibleMerge(edgeTwins[0]);
         tryRemovePossibleMerge(edgeTwins[1]);
-        hull.mVertices.Erase(vertex);
+        mergedVerts.Push(vertex);
         hull.mFaces.Erase(edges[0]->mFace);
         hull.mFaces.Erase(edgeTwins[0]->mFace);
-        hull.mHalfEdges.Erase(edges[0]);
-        hull.mHalfEdges.Erase(edges[1]);
-        hull.mHalfEdges.Erase(edgeTwins[0]);
-        hull.mHalfEdges.Erase(edgeTwins[1]);
+        mergedEdges.Push(edges[0]);
+        mergedEdges.Push(edges[1]);
+        mergedEdges.Push(edgeTwins[0]);
+        mergedEdges.Push(edgeTwins[1]);
       }
       else {
         // When neither of the adjacent faces are triangles, the vertex edges
@@ -531,9 +536,9 @@ Result Hull::QuickHull(const Ds::Vector<Vec3>& points, Video* vid) {
         // Remove no longer necessary elements.
         tryRemovePossibleMerge(edges[1]);
         tryRemovePossibleMerge(edgeTwins[1]);
-        hull.mVertices.Erase(vertex);
-        hull.mHalfEdges.Erase(edges[1]);
-        hull.mHalfEdges.Erase(edgeTwins[1]);
+        mergedVerts.Push(vertex);
+        mergedEdges.Push(edges[1]);
+        mergedEdges.Push(edgeTwins[1]);
       }
     };
 
@@ -568,8 +573,8 @@ Result Hull::QuickHull(const Ds::Vector<Vec3>& points, Video* vid) {
       tryRemovePossibleMerge(edgeTwin);
       hull.mFaces.Erase(edge->mFace);
       hull.mFaces.Erase(edgeTwin->mFace);
-      hull.mHalfEdges.Erase(edge);
-      hull.mHalfEdges.Erase(edgeTwin);
+      mergedEdges.Push(edge);
+      mergedEdges.Push(edgeTwin);
     };
 
     // Check whether a merge should be performed over all possible merges.
@@ -595,6 +600,12 @@ Result Hull::QuickHull(const Ds::Vector<Vec3>& points, Video* vid) {
       else {
         possibleMerges.Pop();
       }
+    }
+    for (const Ds::List<Vertex>::Iter& vertIt: mergedVerts) {
+      hull.mVertices.Erase(vertIt);
+    }
+    for (const Ds::List<HalfEdge>::Iter& edgeIt: mergedEdges) {
+      hull.mHalfEdges.Erase(edgeIt);
     }
 
     // Distribute orphaned conflict points to the new conflict lists. We ignore
