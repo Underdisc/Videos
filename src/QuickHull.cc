@@ -1,15 +1,18 @@
 #include <functional>
 
 #include <comp/Camera.h>
+#include <comp/Mesh.h>
 #include <comp/Transform.h>
 #include <ds/HashMap.h>
 #include <ds/List.h>
+#include <gfx/Material.h>
 #include <gfx/Mesh.h>
 #include <math/Constants.h>
 #include <math/Plane.h>
 #include <math/Ray.h>
 #include <math/Utility.h>
 #include <math/Vector.h>
+#include <rsl/Library.h>
 #include <world/Object.h>
 #include <world/World.h>
 
@@ -43,6 +46,11 @@ struct Hull {
 
 template<>
 size_t Ds::Hash(const Ds::List<Hull::Face>::Iter& it) {
+  return (size_t)it.Current();
+}
+
+template<>
+size_t Ds::Hash(const Ds::List<Hull::HalfEdge>::CIter& it) {
   return (size_t)it.Current();
 }
 
@@ -270,6 +278,96 @@ Result Hull::QuickHull(const Ds::Vector<Vec3>& points, Video* vid) {
     assignConflictPoint(uniquePoint, faceConflictLists);
   }
 
+  // Animation /////////////////////////////////////////////////////////////////
+  static Rsl::Asset& asset = Rsl::RequireAsset("QuickHull/asset");
+  asset.InitRes<Gfx::Material>("VertexColor", "vres/renderer:Color")
+    .Add<Vec4>("uColor") = {4, 4, 4, 1};
+  asset.InitRes<Gfx::Material>("RodColor", "vres/renderer:Color")
+    .Add<Vec4>("uColor") = {1, 3, 1, 1};
+
+  World::Space& space = vid->mLayerIt->mSpace;
+  Sequence& seq = vid->mSeq;
+  Ds::Vector<World::Object> vertexSpheres;
+  for (const Vec3& uniquePoint: uniquePoints) {
+    vertexSpheres.Push(space.CreateObject());
+    auto& mesh = vertexSpheres.Top().Add<Comp::Mesh>();
+    mesh.mMeshId = "vres/gizmo:Sphere";
+    mesh.mMaterialId = "QuickHull/asset:VertexColor";
+    auto& transform = vertexSpheres.Top().Get<Comp::Transform>();
+    transform.SetTranslation(uniquePoint);
+    transform.SetUniformScale(0.0f);
+  }
+  Sequence::AddOptions ao = {
+    .mName = "CreatePoints",
+    .mDuration = 1.0f,
+    .mEase = EaseType::Linear,
+  };
+  seq.Add(ao, [=](float t) {
+    for (World::Object vertexSphere: vertexSpheres) {
+      vertexSphere.Get<Comp::Transform>().SetUniformScale(t / 20.0f);
+    }
+  });
+  seq.Wait();
+
+  struct EdgeRodInfo {
+    World::Object mObject;
+    Vec3 mEdgeCenter;
+    Vec3 mVertexPosition;
+    Vec3 mRodSpan;
+  };
+  auto createEdgeRods =
+    [&space](
+      const Ds::Vector<Ds::List<HalfEdge>::CIter>& edgeIters,
+      Ds::HashMap<Ds::List<HalfEdge>::CIter, EdgeRodInfo>* edgeRodInfos) {
+    for (const auto& edgeIt: edgeIters) {
+      Vec3 vertexPosition = edgeIt->mVertex->mPosition;
+      Vec3 twinVertexPosition = edgeIt->mTwin->mVertex->mPosition;
+      Vec3 edgeCenter = (vertexPosition + twinVertexPosition) / 2.0f;
+      Vec3 rodSpan = vertexPosition - edgeCenter;
+      EdgeRodInfo newInfo = {
+        space.CreateObject(), edgeCenter, vertexPosition, rodSpan};
+      edgeRodInfos->Insert(edgeIt, newInfo);
+
+      World::Object& edgeRod = newInfo.mObject;
+      auto& mesh = edgeRod.Add<Comp::Mesh>();
+      mesh.mMeshId = "QuickHull/asset:Rod";
+      mesh.mMaterialId = "QuickHull/asset:RodColor";
+      auto& transform = edgeRod.Get<Comp::Transform>();
+      transform.SetTranslation((vertexPosition + twinVertexPosition) / 2.0f);
+      transform.SetScale({0, 0, 0});
+    }
+  };
+
+  Ds::Vector<Ds::List<HalfEdge>::CIter> edgeIters;
+  Ds::List<HalfEdge>::CIter edgeIt = hull.mHalfEdges.cbegin();
+  Ds::List<HalfEdge>::CIter edgeItE = hull.mHalfEdges.cend();
+  while (edgeIt != edgeItE) {
+    edgeIters.Push(edgeIt);
+    ++edgeIt;
+  }
+  Ds::HashMap<Ds::List<HalfEdge>::CIter, EdgeRodInfo> edgeRodInfos;
+  createEdgeRods(edgeIters, &edgeRodInfos);
+
+  ao = {
+    .mName = "CreateInitialRods",
+    .mDuration = 1.0f,
+    .mEase = EaseType::Linear,
+  };
+  seq.Add(ao, [=](float t) {
+    for (const auto& info: edgeRodInfos) {
+      auto& transform = info.mValue.mObject.Get<Comp::Transform>();
+      Quat orientation = Quat::FromTo({1, 0, 0}, info.mValue.mRodSpan);
+      transform.SetRotation(orientation);
+      Vec3 rodEnd = info.mValue.mEdgeCenter + t * info.mValue.mRodSpan;
+      Vec3 rodCenter = (info.mValue.mEdgeCenter + rodEnd) / 2.0f;
+      transform.SetTranslation(rodCenter);
+      Vec3 currentRodSpan = rodEnd - info.mValue.mEdgeCenter;
+      transform.SetScale({Math::Magnitude(currentRodSpan), 0.5f, 0.5f});
+    }
+  });
+  seq.Wait();
+  // !Animation ////////////////////////////////////////////////////////////////
+
   // Any faces without conflicting points do not need to be considered.
   auto faceConflictListIt = faceConflictLists.begin();
   while (faceConflictListIt != faceConflictLists.end()) {
@@ -387,6 +485,42 @@ Result Hull::QuickHull(const Ds::Vector<Vec3>& points, Video* vid) {
       hEdgeNext->mTwin->mPrev->mTwin = hEdge->mTwin->mNext;
     }
 
+    // Animation ///////////////////////////////////////////////////////////////
+    Ds::HashMap<Ds::List<HalfEdge>::CIter, EdgeRodInfo> newEdgeRodInfos;
+    edgeIters.Clear();
+    for (int i = 0; i < horizon.Size(); ++i) {
+      Ds::List<HalfEdge>::CIter hEdge = horizon[i];
+      edgeIters.Push(horizon[i]->mTwin);
+      edgeIters.Push(horizon[i]->mTwin->mNext);
+      edgeIters.Push(horizon[i]->mTwin->mNext->mTwin);
+    }
+    createEdgeRods(edgeIters, &newEdgeRodInfos);
+    auto newEdgeRodInfosIt = newEdgeRodInfos.cbegin();
+    auto newEdgeRodInfosItE = newEdgeRodInfos.cend();
+    while (newEdgeRodInfosIt != newEdgeRodInfosItE) {
+      edgeRodInfos.Insert(newEdgeRodInfosIt->Key(), newEdgeRodInfosIt->mValue);
+      ++newEdgeRodInfosIt;
+    }
+    ao = {
+      .mName = "CreateNewEdgeRods",
+      .mDuration = 1.0f,
+      .mEase = EaseType::Linear,
+    };
+    seq.Add(ao, [=](float t) {
+      for (const auto& info: newEdgeRodInfos) {
+        auto& transform = info.mValue.mObject.Get<Comp::Transform>();
+        Quat orientation = Quat::FromTo({1, 0, 0}, info.mValue.mRodSpan);
+        transform.SetRotation(orientation);
+        Vec3 rodEnd = info.mValue.mVertexPosition - t * info.mValue.mRodSpan;
+        Vec3 rodCenter = (info.mValue.mVertexPosition + rodEnd) / 2.0f;
+        transform.SetTranslation(rodCenter);
+        Vec3 currentRodSpan = rodEnd - info.mValue.mVertexPosition;
+        transform.SetScale({Math::Magnitude(currentRodSpan), 0.5f, 0.5f});
+      }
+    });
+    seq.Wait();
+    // !Animation //////////////////////////////////////////////////////////////
+
     // Any time we delete a face, we need to see if that face has an existing or
     // new conflict list associated with it. If it has an existing conflict
     // list, we save its conflict points in order to reassign them to the new
@@ -423,6 +557,34 @@ Result Hull::QuickHull(const Ds::Vector<Vec3>& points, Video* vid) {
       tryRemoveFaceConflictList(faceIt);
       hull.mFaces.Erase(faceIt);
     }
+
+    // Animation ///////////////////////////////////////////////////////////////
+    Ds::Vector<EdgeRodInfo> removedRodInfo;
+    for (auto edgeIt: deadEdges) {
+      auto edgeRodInfoIt = edgeRodInfos.Find(edgeIt);
+      if (edgeRodInfoIt != edgeRodInfos.end()) {
+        removedRodInfo.Push(edgeRodInfoIt->mValue);
+        edgeRodInfos.Remove(edgeRodInfoIt);
+      }
+    }
+    ao = {
+      .mName = "RemoveCoveredRods",
+      .mDuration = 1.0f,
+      .mEase = EaseType::Linear,
+    };
+    seq.Add(ao, [=](float t) {
+      for (const auto& info: removedRodInfo) {
+        auto& transform = info.mObject.Get<Comp::Transform>();
+        Vec3 rodEnd = info.mVertexPosition - (1.0f - t) * info.mRodSpan;
+        Vec3 rodCenter = (info.mVertexPosition + rodEnd) / 2.0f;
+        transform.SetTranslation(rodCenter);
+        Vec3 currentRodSpan = rodEnd - info.mVertexPosition;
+        transform.SetScale({Math::Magnitude(currentRodSpan), 0.5f, 0.5f});
+      }
+    });
+    seq.Wait();
+    // !Animation //////////////////////////////////////////////////////////////
+
     for (const Ds::List<Vertex>::Iter& vertIt: deadVerts) {
       hull.mVertices.Erase(vertIt);
     }
@@ -601,6 +763,33 @@ Result Hull::QuickHull(const Ds::Vector<Vec3>& points, Video* vid) {
         possibleMerges.Pop();
       }
     }
+
+    // Animation ///////////////////////////////////////////////////////////////
+    removedRodInfo.Clear();
+    for (auto edgeIt: mergedEdges) {
+      auto edgeRodInfoIt = edgeRodInfos.Find(edgeIt);
+      if (edgeRodInfoIt != edgeRodInfos.end()) {
+        removedRodInfo.Push(edgeRodInfoIt->mValue);
+        edgeRodInfos.Remove(edgeRodInfoIt);
+      }
+    }
+    ao = {
+      .mName = "RemoveMergedRods",
+      .mDuration = 1.0f,
+      .mEase = EaseType::Linear,
+    };
+    seq.Add(ao, [=](float t) {
+      for (const auto& info: removedRodInfo) {
+        auto& transform = info.mObject.Get<Comp::Transform>();
+        Vec3 rodEnd = info.mVertexPosition - (1.0f - t) * info.mRodSpan;
+        Vec3 rodCenter = (info.mVertexPosition + rodEnd) / 2.0f;
+        transform.SetTranslation(rodCenter);
+        Vec3 currentRodSpan = rodEnd - info.mVertexPosition;
+        transform.SetScale({Math::Magnitude(currentRodSpan), 0.5f, 0.5f});
+      }
+    });
+    // !Animation //////////////////////////////////////////////////////////////
+
     for (const Ds::List<Vertex>::Iter& vertIt: mergedVerts) {
       hull.mVertices.Erase(vertIt);
     }

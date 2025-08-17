@@ -1,0 +1,11 @@
+[
+  {
+    :Name: 'Rod'
+    :Type: 'Mesh'
+    :Config: {
+      :File: 'model/rod.obj'
+      :FlipUvs: '0'
+      :Scale: '1'
+    }
+  }
+]
