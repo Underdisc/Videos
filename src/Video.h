@@ -25,12 +25,18 @@ float Ease(float t, EaseType easeType);
 struct Sequence {
   Sequence();
 
+  enum class Cross {
+    In,
+    Out,
+  };
   struct Event {
     std::string mName;
     float mStartTime;
     float mEndTime;
     EaseType mEase;
-    std::function<void(float t)> mFunction;
+    std::function<void(Cross dir)> mBegin;
+    std::function<void(float t)> mLerp;
+    std::function<void(Cross dir)> mEnd;
     void Run(float t) const;
   };
 
@@ -38,8 +44,11 @@ struct Sequence {
     std::string mName;
     float mDuration;
     EaseType mEase;
+    std::function<void(Cross dir)> mBegin;
+    std::function<void(float t)> mLerp;
+    std::function<void(Cross dir)> mEnd;
   };
-  void Add(const AddOptions& options, std::function<void(float t)> function);
+  void Add(const AddOptions& options);
   void Gap(float duration);
   void Wait();
 
