@@ -240,22 +240,25 @@ Result Hull::QuickHull(const Ds::Vector<Vec3>& points, Video* vid) {
   auto assignConflictPoint =
     [&](
       const Vec3& point,
-      Ds::HashMap<Ds::List<Face>::Iter, ConflictList>& faceConflictLists) {
-      float minDist = FLT_MAX;
-      auto bestFaceConflictListIt = faceConflictLists.end();
-      auto faceContlictListIt = faceConflictLists.begin();
-      while (faceContlictListIt != faceConflictLists.end()) {
-        float dist = faceContlictListIt->mValue.mPlane.Distance(point);
-        if (dist > epsilon && dist < minDist) {
-          minDist = dist;
-          bestFaceConflictListIt = faceContlictListIt;
-        }
-        ++faceContlictListIt;
+      Ds::HashMap<Ds::List<Face>::Iter, ConflictList>& faceConflictLists)
+    -> bool {
+    float minDist = FLT_MAX;
+    auto bestFaceConflictListIt = faceConflictLists.end();
+    auto faceContlictListIt = faceConflictLists.begin();
+    while (faceContlictListIt != faceConflictLists.end()) {
+      float dist = faceContlictListIt->mValue.mPlane.Distance(point);
+      if (dist > epsilon && dist < minDist) {
+        minDist = dist;
+        bestFaceConflictListIt = faceContlictListIt;
       }
-      if (bestFaceConflictListIt != faceConflictLists.end()) {
-        bestFaceConflictListIt->mValue.mPoints.Push({point, minDist});
-      }
-    };
+      ++faceContlictListIt;
+    }
+    if (bestFaceConflictListIt != faceConflictLists.end()) {
+      bestFaceConflictListIt->mValue.mPoints.Push({point, minDist});
+      return true;
+    }
+    return false;
+  };
 
   // We only use unique points to define the hull. Equivalent points can
   // potentially be added to the hull multiple times, resulting in a degenerate
@@ -274,8 +277,11 @@ Result Hull::QuickHull(const Ds::Vector<Vec3>& points, Video* vid) {
       uniquePoints.Push(point);
     }
   }
+  Ds::Vector<Vec3> removedPoints;
   for (const Vec3& uniquePoint: uniquePoints) {
-    assignConflictPoint(uniquePoint, faceConflictLists);
+    if (!assignConflictPoint(uniquePoint, faceConflictLists)) {
+      removedPoints.Push(uniquePoint);
+    }
   }
 
   // Animation /////////////////////////////////////////////////////////////////
@@ -477,6 +483,9 @@ Result Hull::QuickHull(const Ds::Vector<Vec3>& points, Video* vid) {
         } while ((currentEdge = currentEdge->mNext) != edge);
       };
     visitEdge(bestFaceConflictListIt->Key()->mHalfEdge);
+
+    removedPoints.Clear();
+    removedPoints.Push(newPoint);
 
     // We create a new vertex for each horizon vertex because it makes deleting
     // no longer needed elements a bit easier.
@@ -775,6 +784,7 @@ Result Hull::QuickHull(const Ds::Vector<Vec3>& points, Video* vid) {
       if (vertexEdges.Size() != 2) {
         return;
       }
+      removedPoints.Push(vertex->mPosition);
 
       // How we deal with this topological error is determined by the number of
       // vertices the two adjacent faces have.
@@ -991,7 +1001,9 @@ Result Hull::QuickHull(const Ds::Vector<Vec3>& points, Video* vid) {
     // Distribute orphaned conflict points to the new conflict lists. We ignore
     // any conflict lists that have no conflict points.
     for (const Vec3& point: conflictPoints) {
-      assignConflictPoint(point, newFaceConflictLists);
+      if (!assignConflictPoint(point, newFaceConflictLists)) {
+        removedPoints.Push(point);
+      }
     }
     for (auto& newFaceConflictListIt: newFaceConflictLists) {
       ConflictList& newFaceConflistList = newFaceConflictListIt.mValue;
