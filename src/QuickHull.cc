@@ -324,6 +324,7 @@ Result Hull::QuickHull(const Ds::Vector<Vec3>& points, Video* vid) {
     auto& mesh = vertexSphere.Add<Comp::Mesh>();
     mesh.mMeshId = "vres/gizmo:Sphere";
     mesh.mMaterialId = "QuickHull/asset:VertexColor";
+    mesh.mVisible = false;
     auto& transform = vertexSphere.Get<Comp::Transform>();
     transform.SetTranslation(uniquePoint);
     transform.SetUniformScale(0.0f);
@@ -409,6 +410,7 @@ Result Hull::QuickHull(const Ds::Vector<Vec3>& points, Video* vid) {
         auto& mesh = edgeRod.Add<Comp::Mesh>();
         mesh.mMeshId = "QuickHull/asset:Rod";
         mesh.mMaterialId = "QuickHull/asset:RodColor";
+        mesh.mVisible = false;
         auto& transform = edgeRod.Get<Comp::Transform>();
         transform.SetTranslation((vertexPosition + twinVertexPosition) / 2.0f);
         transform.SetScale({0, 0, 0});
@@ -433,9 +435,12 @@ Result Hull::QuickHull(const Ds::Vector<Vec3>& points, Video* vid) {
       [=](Sequence::Cross dir) {
         for (const auto& info: edgeRodInfos) {
           auto& mesh = info.mValue.mObject.Get<Comp::Mesh>();
-          if (dir == Sequence::Cross::In)
+          if (dir == Sequence::Cross::In) {
+            mesh.mVisible = true;
             mesh.mMaterialId = "QuickHull/asset:AddedRodColor";
+          }
           else {
+            mesh.mVisible = false;
             mesh.mMaterialId = "QuickHull/asset:RodColor";
           }
         }
@@ -534,9 +539,11 @@ Result Hull::QuickHull(const Ds::Vector<Vec3>& points, Video* vid) {
           auto& mesh =
             vertexSpheres.Find(removedPoint)->mValue.Get<Comp::Mesh>();
           if (dir == Sequence::Cross::In) {
+            mesh.mVisible = true;
             mesh.mMaterialId = "QuickHull/asset:RemovedVertexColor";
           }
           else {
+            mesh.mVisible = false;
             mesh.mMaterialId = "QuickHull/asset:VertexColor";
           }
         }
@@ -734,9 +741,11 @@ Result Hull::QuickHull(const Ds::Vector<Vec3>& points, Video* vid) {
           for (const auto& info: newEdgeRodInfos) {
             auto& mesh = info.mValue.mObject.Get<Comp::Mesh>();
             if (dir == Sequence::Cross::In) {
+              mesh.mVisible = true;
               mesh.mMaterialId = "QuickHull/asset:AddedRodColor";
             }
             else {
+              mesh.mVisible = false;
               mesh.mMaterialId = "QuickHull/asset:RodColor";
             }
           }
@@ -890,9 +899,11 @@ Result Hull::QuickHull(const Ds::Vector<Vec3>& points, Video* vid) {
             for (const auto& info: removedRodInfos) {
               auto& mesh = info.mObject.Get<Comp::Mesh>();
               if (dir == Sequence::Cross::In) {
+                mesh.mVisible = true;
                 mesh.mMaterialId = "QuickHull/asset:RemovedRodColor";
               }
               else {
+                mesh.mVisible = false;
                 mesh.mMaterialId = "QuickHull/asset:RodColor";
               }
             }
@@ -1188,9 +1199,11 @@ Result Hull::QuickHull(const Ds::Vector<Vec3>& points, Video* vid) {
             for (const auto& info: mergedRodInfos) {
               auto& mesh = info.mObject.Get<Comp::Mesh>();
               if (dir == Sequence::Cross::In) {
+                mesh.mVisible = true;
                 mesh.mMaterialId = "QuickHull/asset:MergedRodColor";
               }
               else {
+                mesh.mVisible = false;
                 mesh.mMaterialId = "QuickHull/asset:RodColor";
               }
             }
@@ -1268,9 +1281,11 @@ Result Hull::QuickHull(const Ds::Vector<Vec3>& points, Video* vid) {
             auto& mesh =
               vertexSpheres.Find(removedPoint)->mValue.Get<Comp::Mesh>();
             if (dir == Sequence::Cross::In) {
+              mesh.mVisible = true;
               mesh.mMaterialId = "QuickHull/asset:RemovedVertexColor";
             }
             else {
+              mesh.mVisible = false;
               mesh.mMaterialId = "QuickHull/asset:VertexColor";
             }
           }
