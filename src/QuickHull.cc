@@ -54,6 +54,12 @@ size_t Ds::Hash(const Ds::List<Hull::HalfEdge>::CIter& it) {
   return (size_t)it.Current();
 }
 
+template<>
+size_t Ds::Hash(const Vec3& pos) {
+  // These numbers were chosen randomly.
+  return (size_t)(pos[0] * 153.04f, pos[1] * 268.22f, pos[2] * 58.6f);
+}
+
 Math::Plane Hull::Face::Plane() const {
   Ds::Vector<Vec3> points;
   Ds::List<HalfEdge>::Iter currentEdge = mHalfEdge;
@@ -286,13 +292,19 @@ Result Hull::QuickHull(const Ds::Vector<Vec3>& points, Video* vid) {
 
   // Animation /////////////////////////////////////////////////////////////////
   static Rsl::Asset& asset = Rsl::RequireAsset("QuickHull/asset");
-  const Vec4 vertexColor = {4, 4, 4, 1};
+  const Vec4 vertexColor = {1, 1, 1, 1};
+  const Vec4 addedVertexColor = {2, 9, 2, 1};
+  const Vec4 removedVertexColor = {9, 2, 2, 1};
   const Vec4 rodColor = {1, 1, 1, 1};
   const Vec4 addedRodColor = {2, 9, 2, 1};
   const Vec4 removedRodColor = {9, 2, 2, 1};
   const Vec4 mergedRodColor = {2, 9, 9, 1};
   asset.InitRes<Gfx::Material>("VertexColor", "vres/renderer:Color")
     .Add<Vec4>("uColor") = vertexColor;
+  asset.InitRes<Gfx::Material>("AddedVertexColor", "vres/renderer:Color")
+    .Add<Vec4>("uColor") = addedVertexColor;
+  asset.InitRes<Gfx::Material>("RemovedVertexColor", "vres/renderer:Color")
+    .Add<Vec4>("uColor") = removedVertexColor;
   asset.InitRes<Gfx::Material>("RodColor", "vres/renderer:Color")
     .Add<Vec4>("uColor") = rodColor;
   asset.InitRes<Gfx::Material>("AddedRodColor", "vres/renderer:Color")
@@ -304,26 +316,72 @@ Result Hull::QuickHull(const Ds::Vector<Vec3>& points, Video* vid) {
 
   World::Space& space = vid->mLayerIt->mSpace;
   Sequence& seq = vid->mSeq;
-  Ds::Vector<World::Object> vertexSpheres;
+  constexpr float vertexSphereScale = 1.0f / 20.0f;
+  Ds::HashMap<Vec3, World::Object> vertexSpheres;
   for (const Vec3& uniquePoint: uniquePoints) {
-    vertexSpheres.Push(space.CreateObject());
-    auto& mesh = vertexSpheres.Top().Add<Comp::Mesh>();
+    World::Object vertexSphere =
+      vertexSpheres.Insert(uniquePoint, space.CreateObject())->mValue;
+    auto& mesh = vertexSphere.Add<Comp::Mesh>();
     mesh.mMeshId = "vres/gizmo:Sphere";
     mesh.mMaterialId = "QuickHull/asset:VertexColor";
-    auto& transform = vertexSpheres.Top().Get<Comp::Transform>();
+    auto& transform = vertexSphere.Get<Comp::Transform>();
     transform.SetTranslation(uniquePoint);
     transform.SetUniformScale(0.0f);
   }
 
   seq.Add({
-    .mName = "CreatePoints",
+    .mName = "CreateAllPotentialVetices",
     .mDuration = 1.0f,
     .mEase = EaseType::Linear,
+    .mBegin =
+      [=](Sequence::Cross dir) {
+        for (const auto& vsIt: vertexSpheres) {
+          auto& mesh = vsIt.mValue.Get<Comp::Mesh>();
+          if (dir == Sequence::Cross::In) {
+            mesh.mVisible = true;
+          }
+          else {
+            mesh.mVisible = false;
+          }
+        }
+      },
     .mLerp =
       [=](float t) {
-        for (World::Object vertexSphere: vertexSpheres) {
-          vertexSphere.Get<Comp::Transform>().SetUniformScale(t / 20.0f);
+        for (const auto& vsIt: vertexSpheres) {
+          vsIt.mValue.Get<Comp::Transform>().SetUniformScale(
+            t * vertexSphereScale);
         }
+      },
+  });
+  seq.Wait();
+
+  Ds::Vector<Vec3> initialVertexPositions;
+  for (auto vertIt = hull.mVertices.cbegin(); vertIt != hull.mVertices.cend();
+       ++vertIt) {
+    initialVertexPositions.Push(vertIt->mPosition);
+  }
+
+  seq.Add({
+    .mName = "HighlightInitialVertices",
+    .mDuration = 1.0f,
+    .mEase = EaseType::Linear,
+    .mBegin =
+      [=](Sequence::Cross dir) {
+        for (const Vec3& pos: initialVertexPositions) {
+          World::Object vertexSphere = vertexSpheres.Find(pos)->mValue;
+          auto& mesh = vertexSphere.Get<Comp::Mesh>();
+          if (dir == Sequence::Cross::In) {
+            mesh.mMaterialId = "QuickHull/asset:AddedVertexColor";
+          }
+          else {
+            mesh.mMaterialId = "QuickHull/asset:VertexColor";
+          }
+        }
+      },
+    .mLerp =
+      [=](float t) {
+        Rsl::GetRes<Gfx::Material>("QuickHull/asset:AddedVertexColor")
+          .Get<Vec4>("uColor") = Lerp(vertexColor, addedVertexColor, t);
       },
   });
   seq.Wait();
@@ -399,14 +457,15 @@ Result Hull::QuickHull(const Ds::Vector<Vec3>& points, Video* vid) {
   seq.Wait();
 
   seq.Add({
-    .mName = "FadeAwayInitialAddedRodColor",
+    .mName = "FadeAwayInitialAddedColors",
     .mDuration = 1.0f,
     .mEase = EaseType::Linear,
     .mLerp =
       [=](float t) {
-        auto& addedRodColorMat =
-          Rsl::GetRes<Gfx::Material>("QuickHull/asset:AddedRodColor");
-        addedRodColorMat.Get<Vec4>("uColor") = Lerp(addedRodColor, rodColor, t);
+        Rsl::GetRes<Gfx::Material>("QuickHull/asset:AddedRodColor")
+          .Get<Vec4>("uColor") = Lerp(addedRodColor, rodColor, t);
+        Rsl::GetRes<Gfx::Material>("QuickHull/asset:AddedVertexColor")
+          .Get<Vec4>("uColor") = Lerp(addedVertexColor, vertexColor, t);
       },
     .mEnd =
       [=](Sequence::Cross dir) {
@@ -418,6 +477,71 @@ Result Hull::QuickHull(const Ds::Vector<Vec3>& points, Video* vid) {
             mesh.mMaterialId = "QuickHull/asset:RodColor";
           }
         }
+        for (const Vec3& pos: initialVertexPositions) {
+          World::Object vertexSphere = vertexSpheres.Find(pos)->mValue;
+          auto& mesh = vertexSphere.Get<Comp::Mesh>();
+          if (dir == Sequence::Cross::In) {
+            mesh.mMaterialId = "QuickHull/asset:AddedVertexColor";
+          }
+          else {
+            mesh.mMaterialId = "QuickHull/asset:VertexColor";
+          }
+        }
+      },
+  });
+  seq.Wait();
+
+  seq.Add({
+    .mName = "HighlightRemovedVertices",
+    .mDuration = 1.0f,
+    .mEase = EaseType::Linear,
+    .mBegin =
+      [=](Sequence::Cross dir) {
+        for (const Vec3& removedPoint: removedPoints) {
+          auto& mesh =
+            vertexSpheres.Find(removedPoint)->mValue.Get<Comp::Mesh>();
+          if (dir == Sequence::Cross::In) {
+            mesh.mMaterialId = "QuickHull/asset:RemovedVertexColor";
+          }
+          else {
+            mesh.mMaterialId = "QuickHull/asset:VertexColor";
+          }
+        }
+      },
+    .mLerp =
+      [=](float t) {
+        Rsl::GetRes<Gfx::Material>("QuickHull/asset:RemovedVertexColor")
+          .Get<Vec4>("uColor") = Lerp(vertexColor, removedVertexColor, t);
+      },
+  });
+  seq.Wait();
+
+  seq.Add({
+    .mName = "RemoveRemovedVertexSpheres",
+    .mDuration = 1.0f,
+    .mEase = EaseType::Linear,
+    .mLerp =
+      [=](float t) {
+        for (const Vec3& removedPoint: removedPoints) {
+          auto& transform =
+            vertexSpheres.Find(removedPoint)->mValue.Get<Comp::Transform>();
+          transform.SetUniformScale((1.0f - t) * vertexSphereScale);
+        }
+      },
+    .mEnd =
+      [=](Sequence::Cross dir) {
+        for (const Vec3& removedPoint: removedPoints) {
+          auto& mesh =
+            vertexSpheres.Find(removedPoint)->mValue.Get<Comp::Mesh>();
+          if (dir == Sequence::Cross::In) {
+            mesh.mMaterialId = "QuickHull/asset:RemovedVertexColor";
+          }
+          else {
+            mesh.mMaterialId = "QuickHull/asset:VertexColor";
+          }
+        }
+        Rsl::GetRes<Gfx::Material>("QuickHull/asset:RemovedVertexColor")
+          .Get<Vec4>("uColor") = removedVertexColor;
       },
   });
   seq.Wait();
@@ -579,6 +703,29 @@ Result Hull::QuickHull(const Ds::Vector<Vec3>& points, Video* vid) {
     }
 
     seq.Add({
+      .mName = "HighlightNewVertex",
+      .mDuration = 1.0f,
+      .mEase = EaseType::Linear,
+      .mBegin =
+        [=](Sequence::Cross dir) {
+          World::Object vertexSphere = vertexSpheres.Find(newPoint)->mValue;
+          auto& mesh = vertexSphere.Get<Comp::Mesh>();
+          if (dir == Sequence::Cross::In) {
+            mesh.mMaterialId = "QuickHull/asset:AddedVertexColor";
+          }
+          else {
+            mesh.mMaterialId = "QuickHull/asset:VertexColor";
+          }
+        },
+      .mLerp =
+        [=](float t) {
+          Rsl::GetRes<Gfx::Material>("QuickHull/asset:AddedVertexColor")
+            .Get<Vec4>("uColor") = Lerp(vertexColor, addedVertexColor, t);
+        },
+    });
+    seq.Wait();
+
+    seq.Add({
       .mName = "CreateNewEdgeRods",
       .mDuration = 1.0f,
       .mEase = EaseType::Linear,
@@ -612,27 +759,40 @@ Result Hull::QuickHull(const Ds::Vector<Vec3>& points, Video* vid) {
     seq.Wait();
 
     seq.Add({
-      .mName = "FadeAwayNewAddedRodColor",
+      .mName = "FadeAddedColors",
       .mDuration = 1.0f,
       .mEase = EaseType::Linear,
       .mLerp =
         [=](float t) {
           Rsl::GetRes<Gfx::Material>("QuickHull/asset:AddedRodColor")
             .Get<Vec4>("uColor") = Lerp(addedRodColor, rodColor, t);
+          Rsl::GetRes<Gfx::Material>("QuickHull/asset:AddedVertexColor")
+            .Get<Vec4>("uColor") = Lerp(addedVertexColor, vertexColor, t);
         },
       .mEnd =
         [=](Sequence::Cross dir) {
           for (const auto& info: newEdgeRodInfos) {
-            auto& mesh = info.mValue.mObject.Get<Comp::Mesh>();
+            auto& rodMesh = info.mValue.mObject.Get<Comp::Mesh>();
             if (dir == Sequence::Cross::In) {
-              mesh.mMaterialId = "QuickHull/asset:AddedRodColor";
+              rodMesh.mMaterialId = "QuickHull/asset:AddedRodColor";
             }
             else {
-              mesh.mMaterialId = "QuickHull/asset:RodColor";
+              rodMesh.mMaterialId = "QuickHull/asset:RodColor";
             }
           }
           Rsl::GetRes<Gfx::Material>("QuickHull/asset:AddedRodColor")
             .Get<Vec4>("uColor") = addedRodColor;
+
+          auto& vertexMesh =
+            vertexSpheres.Find(newPoint)->mValue.Get<Comp::Mesh>();
+          if (dir == Sequence::Cross::In) {
+            vertexMesh.mMaterialId = "QuickHull/asset:AddedVertexColor";
+          }
+          else {
+            vertexMesh.mMaterialId = "QuickHull/asset:VertexColor";
+          }
+          Rsl::GetRes<Gfx::Material>("QuickHull/asset:AddedVertexColor")
+            .Get<Vec4>("uColor") = addedVertexColor;
         },
     });
     seq.Wait();
@@ -1012,6 +1172,63 @@ Result Hull::QuickHull(const Ds::Vector<Vec3>& points, Video* vid) {
           newFaceConflictListIt.Key(), std::move(newFaceConflistList));
       }
     }
+
+    // Animation ///////////////////////////////////////////////////////////////
+    seq.Add({
+      .mName = "HighlightRemovedVertices",
+      .mDuration = 1.0f,
+      .mEase = EaseType::Linear,
+      .mBegin =
+        [=](Sequence::Cross dir) {
+          for (const Vec3& removedPoint: removedPoints) {
+            auto& mesh =
+              vertexSpheres.Find(removedPoint)->mValue.Get<Comp::Mesh>();
+            if (dir == Sequence::Cross::In) {
+              mesh.mMaterialId = "QuickHull/asset:RemovedVertexColor";
+            }
+            else {
+              mesh.mMaterialId = "QuickHull/asset:VertexColor";
+            }
+          }
+        },
+      .mLerp =
+        [=](float t) {
+          Rsl::GetRes<Gfx::Material>("QuickHull/asset:RemovedVertexColor")
+            .Get<Vec4>("uColor") = Lerp(vertexColor, removedVertexColor, t);
+        },
+    });
+    seq.Wait();
+
+    seq.Add({
+      .mName = "RemoveRemovedVertexSpheres",
+      .mDuration = 1.0f,
+      .mEase = EaseType::Linear,
+      .mLerp =
+        [=](float t) {
+          for (const Vec3& removedPoint: removedPoints) {
+            auto& transform =
+              vertexSpheres.Find(removedPoint)->mValue.Get<Comp::Transform>();
+            transform.SetUniformScale((1.0f - t) * vertexSphereScale);
+          }
+        },
+      .mEnd =
+        [=](Sequence::Cross dir) {
+          for (const Vec3& removedPoint: removedPoints) {
+            auto& mesh =
+              vertexSpheres.Find(removedPoint)->mValue.Get<Comp::Mesh>();
+            if (dir == Sequence::Cross::In) {
+              mesh.mMaterialId = "QuickHull/asset:RemovedVertexColor";
+            }
+            else {
+              mesh.mMaterialId = "QuickHull/asset:VertexColor";
+            }
+          }
+          Rsl::GetRes<Gfx::Material>("QuickHull/asset:RemovedVertexColor")
+            .Get<Vec4>("uColor") = removedVertexColor;
+        },
+    });
+    seq.Wait();
+    // !Animation //////////////////////////////////////////////////////////////
   }
   return Result();
 }
