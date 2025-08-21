@@ -111,7 +111,7 @@ void Sequence::ScrubUp(float scrubTime) {
   Ds::Vector<unsigned int> remainingActiveEvents;
   for (int i = 0; i < mActiveEvents.Size(); ++i) {
     const Event& event = mEvents[mActiveEvents[i]];
-    if (mTimePassed < event.mStartTime) {
+    if (mTimePassed <= event.mStartTime) {
       if (event.mBegin) event.mBegin(Cross::In);
     }
     if (scrubTime >= event.mEndTime) {
