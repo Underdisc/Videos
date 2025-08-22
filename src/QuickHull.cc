@@ -1297,6 +1297,64 @@ Result Hull::QuickHull(const Ds::Vector<Vec3>& points, Video* vid) {
     seq.Wait();
     // !Animation //////////////////////////////////////////////////////////////
   }
+
+  // Animation /////////////////////////////////////////////////////////////////
+  const Vec4 pulseColor = {5, 5, 5, 1};
+  const Vec4 vanishColor = {1, 1, 1, 0};
+  asset.InitRes<Gfx::Material>("PulseColor", "vres/renderer:Color")
+    .Add<Vec4>("uColor") = pulseColor;
+
+  seq.Add({
+    .mName = "PulseBloomRemainingElements",
+    .mDuration = 1.0f,
+    .mEase = EaseType::Linear,
+    .mBegin =
+      [=](Sequence::Cross dir) {
+        for (const auto& edgeRodInfo: edgeRodInfos) {
+          auto& mesh = edgeRodInfo.mValue.mObject.Get<Comp::Mesh>();
+          if (dir == Sequence::Cross::In) {
+            mesh.mMaterialId = "QuickHull/asset:PulseColor";
+          }
+          else {
+            mesh.mMaterialId = "QuickHull/asset:RodColor";
+          }
+        }
+      },
+    .mLerp =
+      [=](float t) {
+        Rsl::GetRes<Gfx::Material>("QuickHull/asset:PulseColor")
+          .Get<Vec4>("uColor") = Math::Lerp(rodColor, pulseColor, t);
+      },
+  });
+  seq.Wait();
+
+  seq.Add({
+    .mName = "VanishRemainingElements",
+    .mDuration = 1.0f,
+    .mEase = EaseType::Linear,
+    .mLerp =
+      [=](float t) {
+        Rsl::GetRes<Gfx::Material>("QuickHull/asset:PulseColor")
+          .Get<Vec4>("uColor") = Math::Lerp(pulseColor, vanishColor, t);
+      },
+    .mEnd =
+      [=](Sequence::Cross dir) {
+        for (const auto& edgeRodInfo: edgeRodInfos) {
+          auto& mesh = edgeRodInfo.mValue.mObject.Get<Comp::Mesh>();
+          if (dir == Sequence::Cross::In) {
+            mesh.mVisible = true;
+            mesh.mMaterialId = "QuickHull/asset:PulseColor";
+          }
+          else {
+            mesh.mVisible = false;
+            mesh.mMaterialId = "QuickHull/asset:RodColor";
+          }
+        }
+      },
+  });
+  seq.Wait();
+  // !Animation ////////////////////////////////////////////////////////////////
+
   return Result();
 }
 
