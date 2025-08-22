@@ -42,7 +42,48 @@ struct Hull {
   Ds::List<Face> mFaces;
 
   static Result QuickHull(const Ds::Vector<Vec3>& points, Video* vid);
+
+  static void CreateResources();
+  static const Vec4 smVertexColor;
+  static const Vec4 smAddedVertexColor;
+  static const Vec4 smRemovedVertexColor;
+  static const Vec4 smRodColor;
+  static const Vec4 smAddedRodColor;
+  static const Vec4 smRemovedRodColor;
+  static const Vec4 smMergedRodColor;
+  static const Vec4 smPulseColor;
+  static const Vec4 smVanishColor;
 };
+
+const Vec4 Hull::smVertexColor = {1, 1, 1, 1};
+const Vec4 Hull::smAddedVertexColor = {2, 9, 2, 1};
+const Vec4 Hull::smRemovedVertexColor = {9, 2, 2, 1};
+const Vec4 Hull::smRodColor = {1, 1, 1, 1};
+const Vec4 Hull::smAddedRodColor = {2, 9, 2, 1};
+const Vec4 Hull::smRemovedRodColor = {9, 2, 2, 1};
+const Vec4 Hull::smMergedRodColor = {2, 9, 9, 1};
+const Vec4 Hull::smPulseColor = {5, 5, 5, 1};
+const Vec4 Hull::smVanishColor = {1, 1, 1, 0};
+
+void Hull::CreateResources() {
+  static Rsl::Asset& asset = Rsl::RequireAsset("QuickHull/asset");
+  asset.InitRes<Gfx::Material>("VertexColor", "vres/renderer:Color")
+    .Add<Vec4>("uColor") = smVertexColor;
+  asset.InitRes<Gfx::Material>("AddedVertexColor", "vres/renderer:Color")
+    .Add<Vec4>("uColor") = smAddedVertexColor;
+  asset.InitRes<Gfx::Material>("RemovedVertexColor", "vres/renderer:Color")
+    .Add<Vec4>("uColor") = smRemovedVertexColor;
+  asset.InitRes<Gfx::Material>("RodColor", "vres/renderer:Color")
+    .Add<Vec4>("uColor") = smRodColor;
+  asset.InitRes<Gfx::Material>("AddedRodColor", "vres/renderer:Color")
+    .Add<Vec4>("uColor") = smAddedRodColor;
+  asset.InitRes<Gfx::Material>("RemovedRodColor", "vres/renderer:Color")
+    .Add<Vec4>("uColor") = smRemovedRodColor;
+  asset.InitRes<Gfx::Material>("MergedRodColor", "vres/renderer:Color")
+    .Add<Vec4>("uColor") = smMergedRodColor;
+  asset.InitRes<Gfx::Material>("PulseColor", "vres/renderer:Color")
+    .Add<Vec4>("uColor") = smPulseColor;
+}
 
 template<>
 size_t Ds::Hash(const Ds::List<Hull::Face>::Iter& it) {
@@ -291,29 +332,6 @@ Result Hull::QuickHull(const Ds::Vector<Vec3>& points, Video* vid) {
   }
 
   // Animation /////////////////////////////////////////////////////////////////
-  static Rsl::Asset& asset = Rsl::RequireAsset("QuickHull/asset");
-  const Vec4 vertexColor = {1, 1, 1, 1};
-  const Vec4 addedVertexColor = {2, 9, 2, 1};
-  const Vec4 removedVertexColor = {9, 2, 2, 1};
-  const Vec4 rodColor = {1, 1, 1, 1};
-  const Vec4 addedRodColor = {2, 9, 2, 1};
-  const Vec4 removedRodColor = {9, 2, 2, 1};
-  const Vec4 mergedRodColor = {2, 9, 9, 1};
-  asset.InitRes<Gfx::Material>("VertexColor", "vres/renderer:Color")
-    .Add<Vec4>("uColor") = vertexColor;
-  asset.InitRes<Gfx::Material>("AddedVertexColor", "vres/renderer:Color")
-    .Add<Vec4>("uColor") = addedVertexColor;
-  asset.InitRes<Gfx::Material>("RemovedVertexColor", "vres/renderer:Color")
-    .Add<Vec4>("uColor") = removedVertexColor;
-  asset.InitRes<Gfx::Material>("RodColor", "vres/renderer:Color")
-    .Add<Vec4>("uColor") = rodColor;
-  asset.InitRes<Gfx::Material>("AddedRodColor", "vres/renderer:Color")
-    .Add<Vec4>("uColor") = addedRodColor;
-  asset.InitRes<Gfx::Material>("RemovedRodColor", "vres/renderer:Color")
-    .Add<Vec4>("uColor") = removedRodColor;
-  asset.InitRes<Gfx::Material>("MergedRodColor", "vres/renderer:Color")
-    .Add<Vec4>("uColor") = mergedRodColor;
-
   World::Space& space = vid->mLayerIt->mSpace;
   Sequence& seq = vid->mSeq;
   constexpr float vertexSphereScale = 1.0f / 20.0f;
@@ -383,7 +401,7 @@ Result Hull::QuickHull(const Ds::Vector<Vec3>& points, Video* vid) {
     .mLerp =
       [=](float t) {
         Rsl::GetRes<Gfx::Material>("QuickHull/asset:AddedVertexColor")
-          .Get<Vec4>("uColor") = Lerp(vertexColor, addedVertexColor, t);
+          .Get<Vec4>("uColor") = Lerp(smVertexColor, smAddedVertexColor, t);
       },
   });
   seq.Wait();
@@ -469,9 +487,9 @@ Result Hull::QuickHull(const Ds::Vector<Vec3>& points, Video* vid) {
     .mLerp =
       [=](float t) {
         Rsl::GetRes<Gfx::Material>("QuickHull/asset:AddedRodColor")
-          .Get<Vec4>("uColor") = Lerp(addedRodColor, rodColor, t);
+          .Get<Vec4>("uColor") = Lerp(smAddedRodColor, smRodColor, t);
         Rsl::GetRes<Gfx::Material>("QuickHull/asset:AddedVertexColor")
-          .Get<Vec4>("uColor") = Lerp(addedVertexColor, vertexColor, t);
+          .Get<Vec4>("uColor") = Lerp(smAddedVertexColor, smVertexColor, t);
       },
     .mEnd =
       [=](Sequence::Cross dir) {
@@ -517,7 +535,7 @@ Result Hull::QuickHull(const Ds::Vector<Vec3>& points, Video* vid) {
     .mLerp =
       [=](float t) {
         Rsl::GetRes<Gfx::Material>("QuickHull/asset:RemovedVertexColor")
-          .Get<Vec4>("uColor") = Lerp(vertexColor, removedVertexColor, t);
+          .Get<Vec4>("uColor") = Lerp(smVertexColor, smRemovedVertexColor, t);
       },
   });
   seq.Wait();
@@ -549,7 +567,7 @@ Result Hull::QuickHull(const Ds::Vector<Vec3>& points, Video* vid) {
           }
         }
         Rsl::GetRes<Gfx::Material>("QuickHull/asset:RemovedVertexColor")
-          .Get<Vec4>("uColor") = removedVertexColor;
+          .Get<Vec4>("uColor") = smRemovedVertexColor;
       },
   });
   seq.Wait();
@@ -728,7 +746,7 @@ Result Hull::QuickHull(const Ds::Vector<Vec3>& points, Video* vid) {
       .mLerp =
         [=](float t) {
           Rsl::GetRes<Gfx::Material>("QuickHull/asset:AddedVertexColor")
-            .Get<Vec4>("uColor") = Lerp(vertexColor, addedVertexColor, t);
+            .Get<Vec4>("uColor") = Lerp(smVertexColor, smAddedVertexColor, t);
         },
     });
     seq.Wait();
@@ -775,9 +793,9 @@ Result Hull::QuickHull(const Ds::Vector<Vec3>& points, Video* vid) {
       .mLerp =
         [=](float t) {
           Rsl::GetRes<Gfx::Material>("QuickHull/asset:AddedRodColor")
-            .Get<Vec4>("uColor") = Lerp(addedRodColor, rodColor, t);
+            .Get<Vec4>("uColor") = Lerp(smAddedRodColor, smRodColor, t);
           Rsl::GetRes<Gfx::Material>("QuickHull/asset:AddedVertexColor")
-            .Get<Vec4>("uColor") = Lerp(addedVertexColor, vertexColor, t);
+            .Get<Vec4>("uColor") = Lerp(smAddedVertexColor, smVertexColor, t);
         },
       .mEnd =
         [=](Sequence::Cross dir) {
@@ -791,7 +809,7 @@ Result Hull::QuickHull(const Ds::Vector<Vec3>& points, Video* vid) {
             }
           }
           Rsl::GetRes<Gfx::Material>("QuickHull/asset:AddedRodColor")
-            .Get<Vec4>("uColor") = addedRodColor;
+            .Get<Vec4>("uColor") = smAddedRodColor;
 
           auto& vertexMesh =
             vertexSpheres.Find(newPoint)->mValue.Get<Comp::Mesh>();
@@ -802,7 +820,7 @@ Result Hull::QuickHull(const Ds::Vector<Vec3>& points, Video* vid) {
             vertexMesh.mMaterialId = "QuickHull/asset:VertexColor";
           }
           Rsl::GetRes<Gfx::Material>("QuickHull/asset:AddedVertexColor")
-            .Get<Vec4>("uColor") = addedVertexColor;
+            .Get<Vec4>("uColor") = smAddedVertexColor;
         },
     });
     seq.Wait();
@@ -875,7 +893,7 @@ Result Hull::QuickHull(const Ds::Vector<Vec3>& points, Video* vid) {
         .mLerp =
           [=](float t) {
             Rsl::GetRes<Gfx::Material>("QuickHull/asset:RemovedRodColor")
-              .Get<Vec4>("uColor") = Lerp(rodColor, removedRodColor, t);
+              .Get<Vec4>("uColor") = Lerp(smRodColor, smRemovedRodColor, t);
           },
       });
       seq.Wait();
@@ -909,7 +927,7 @@ Result Hull::QuickHull(const Ds::Vector<Vec3>& points, Video* vid) {
               }
             }
             Rsl::GetRes<Gfx::Material>("QuickHull/asset:RemovedRodColor")
-              .Get<Vec4>("uColor") = removedRodColor;
+              .Get<Vec4>("uColor") = smRemovedRodColor;
           },
       });
       seq.Wait();
@@ -1175,7 +1193,7 @@ Result Hull::QuickHull(const Ds::Vector<Vec3>& points, Video* vid) {
         .mLerp =
           [=](float t) {
             Rsl::GetRes<Gfx::Material>("QuickHull/asset:MergedRodColor")
-              .Get<Vec4>("uColor") = Lerp(rodColor, mergedRodColor, t);
+              .Get<Vec4>("uColor") = Lerp(smRodColor, smMergedRodColor, t);
           },
       });
       seq.Wait();
@@ -1209,7 +1227,7 @@ Result Hull::QuickHull(const Ds::Vector<Vec3>& points, Video* vid) {
               }
             }
             Rsl::GetRes<Gfx::Material>("QuickHull/asset:MergedRodColor")
-              .Get<Vec4>("uColor") = mergedRodColor;
+              .Get<Vec4>("uColor") = smMergedRodColor;
           },
       });
       seq.Wait();
@@ -1259,7 +1277,7 @@ Result Hull::QuickHull(const Ds::Vector<Vec3>& points, Video* vid) {
       .mLerp =
         [=](float t) {
           Rsl::GetRes<Gfx::Material>("QuickHull/asset:RemovedVertexColor")
-            .Get<Vec4>("uColor") = Lerp(vertexColor, removedVertexColor, t);
+            .Get<Vec4>("uColor") = Lerp(smVertexColor, smRemovedVertexColor, t);
         },
     });
     seq.Wait();
@@ -1291,7 +1309,7 @@ Result Hull::QuickHull(const Ds::Vector<Vec3>& points, Video* vid) {
             }
           }
           Rsl::GetRes<Gfx::Material>("QuickHull/asset:RemovedVertexColor")
-            .Get<Vec4>("uColor") = removedVertexColor;
+            .Get<Vec4>("uColor") = smRemovedVertexColor;
         },
     });
     seq.Wait();
@@ -1299,11 +1317,6 @@ Result Hull::QuickHull(const Ds::Vector<Vec3>& points, Video* vid) {
   }
 
   // Animation /////////////////////////////////////////////////////////////////
-  const Vec4 pulseColor = {5, 5, 5, 1};
-  const Vec4 vanishColor = {1, 1, 1, 0};
-  asset.InitRes<Gfx::Material>("PulseColor", "vres/renderer:Color")
-    .Add<Vec4>("uColor") = pulseColor;
-
   seq.Add({
     .mName = "PulseBloomRemainingElements",
     .mDuration = 1.0f,
@@ -1323,7 +1336,7 @@ Result Hull::QuickHull(const Ds::Vector<Vec3>& points, Video* vid) {
     .mLerp =
       [=](float t) {
         Rsl::GetRes<Gfx::Material>("QuickHull/asset:PulseColor")
-          .Get<Vec4>("uColor") = Math::Lerp(rodColor, pulseColor, t);
+          .Get<Vec4>("uColor") = Math::Lerp(smRodColor, smPulseColor, t);
       },
   });
   seq.Wait();
@@ -1335,7 +1348,7 @@ Result Hull::QuickHull(const Ds::Vector<Vec3>& points, Video* vid) {
     .mLerp =
       [=](float t) {
         Rsl::GetRes<Gfx::Material>("QuickHull/asset:PulseColor")
-          .Get<Vec4>("uColor") = Math::Lerp(pulseColor, vanishColor, t);
+          .Get<Vec4>("uColor") = Math::Lerp(smPulseColor, smVanishColor, t);
       },
     .mEnd =
       [=](Sequence::Cross dir) {
@@ -1392,6 +1405,7 @@ Result QuickHull(Video* video) {
   pointClouds.Emplace(points);
 
   // Create the animation sequences for the collected point clouds.
+  Hull::CreateResources();
   for (const Ds::Vector<Vec3>& points: pointClouds) {
     Result result = Hull::QuickHull(points, video);
     if (!result.Success()) {
