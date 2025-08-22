@@ -154,7 +154,7 @@ void Sequence::ScrubDown(float scrubTime) {
 
   // Handle the events and remove events which the scrub time is outside of.
   Ds::Vector<unsigned int> remainingActiveEvents;
-  for (int i = mActiveEvents.Size() - 1; i >= 0; --i) {
+  for (int i = 0; i < mActiveEvents.Size(); ++i) {
     const Event& event = mEvents[mActiveEvents[i]];
     if (mTimePassed >= event.mEndTime) {
       if (event.mEnd) event.mEnd(Cross::In);
