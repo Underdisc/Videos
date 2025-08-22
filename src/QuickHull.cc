@@ -1404,6 +1404,15 @@ Result QuickHull(Video* video) {
   }
   pointClouds.Emplace(points);
 
+  auto addMeshPoints = [&pointClouds](const char* meshFile, float scale) {
+    VResult<Gfx::Mesh::Local> result = Gfx::Mesh::Local::Init(
+      meshFile, Gfx::Mesh::Attribute::Position, false, scale);
+    LogAbortIf(!result.Success(), result.mError.c_str());
+    pointClouds.Emplace(result.mValue.Points());
+  };
+  addMeshPoints("QuickHull/icepick.obj", 1.0f);
+  addMeshPoints("QuickHull/suzanne.obj", 1.0f);
+
   // Create the animation sequences for the collected point clouds.
   Hull::CreateResources();
   for (const Ds::Vector<Vec3>& points: pointClouds) {
