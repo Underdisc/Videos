@@ -318,9 +318,10 @@ Result Hull::QuickHull(const Ds::Vector<Vec3>& points, Video* vid) {
   Sequence& seq = vid->mSeq;
   constexpr float vertexSphereScale = 1.0f / 20.0f;
   Ds::HashMap<Vec3, World::Object> vertexSpheres;
+  World::Object parentObject = space.CreateObject();
   for (const Vec3& uniquePoint: uniquePoints) {
     World::Object vertexSphere =
-      vertexSpheres.Insert(uniquePoint, space.CreateObject())->mValue;
+      vertexSpheres.Insert(uniquePoint, parentObject.CreateChild())->mValue;
     auto& mesh = vertexSphere.Add<Comp::Mesh>();
     mesh.mMeshId = "vres/gizmo:Sphere";
     mesh.mMaterialId = "QuickHull/asset:VertexColor";
@@ -394,7 +395,7 @@ Result Hull::QuickHull(const Ds::Vector<Vec3>& points, Video* vid) {
     Vec3 mRodSpan;
   };
   auto createEdgeRods =
-    [&space](
+    [&parentObject](
       const Ds::Vector<Ds::List<HalfEdge>::CIter>& newRodEdgeIters,
       Ds::HashMap<Ds::List<HalfEdge>::CIter, EdgeRodInfo>* edgeRodInfos) {
       for (const auto& edgeIt: newRodEdgeIters) {
@@ -403,7 +404,7 @@ Result Hull::QuickHull(const Ds::Vector<Vec3>& points, Video* vid) {
         Vec3 edgeCenter = (vertexPosition + twinVertexPosition) / 2.0f;
         Vec3 rodSpan = vertexPosition - edgeCenter;
         EdgeRodInfo newInfo = {
-          space.CreateObject(), edgeCenter, vertexPosition, rodSpan};
+          parentObject.CreateChild(), edgeCenter, vertexPosition, rodSpan};
         edgeRodInfos->Insert(edgeIt, newInfo);
 
         World::Object& edgeRod = newInfo.mObject;
