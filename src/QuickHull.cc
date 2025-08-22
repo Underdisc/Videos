@@ -1021,6 +1021,55 @@ Result Hull::QuickHull(const Ds::Vector<Vec3>& points, Video* vid) {
         mergedVerts.Push(vertex);
         mergedEdges.Push(edges[1]);
         mergedEdges.Push(edgeTwins[1]);
+
+        // Animation ///////////////////////////////////////////////////////////
+        // We instantly remove the no longer needed rods and the rods remaining
+        // after the colinear merge take up the space of the removed edges.
+        Ds::Vector<EdgeRodInfo> disolvedRodInfos;
+        disolvedRodInfos.Push(edgeRodInfos.Find(edges[1])->mValue);
+        disolvedRodInfos.Push(edgeRodInfos.Find(edgeTwins[1])->mValue);
+        edgeRodInfos.Remove(edges[1]);
+        edgeRodInfos.Remove(edgeTwins[1]);
+
+        Ds::List<HalfEdge>::CIter expandedEdgeIts[] = {edges[0], edgeTwins[0]};
+        Ds::Vector<EdgeRodInfo> expandedRodInfos;
+        for (int i = 0; i < 2; ++i) {
+          Ds::List<HalfEdge>::CIter expandedEdgeIt = expandedEdgeIts[i];
+          EdgeRodInfo& edgeRodInfo = edgeRodInfos.Find(expandedEdgeIt)->mValue;
+          Vec3 vertexPosition = expandedEdgeIt->mVertex->mPosition;
+          Vec3 twinVertexPosition = expandedEdgeIt->mTwin->mVertex->mPosition;
+          Vec3 edgeCenter = (vertexPosition + twinVertexPosition) / 2.0f;
+          Vec3 rodSpan = vertexPosition - edgeCenter;
+          edgeRodInfo.mEdgeCenter = edgeCenter;
+          edgeRodInfo.mRodSpan = rodSpan;
+          expandedRodInfos.Push(edgeRodInfo);
+        }
+
+        seq.Add({
+          .mName = "HandleColinearMerge",
+          .mDuration = 0.0f,
+          .mBegin =
+            [=](Sequence::Cross dir) {
+              if (dir == Sequence::Cross::In) {
+                for (auto& edgeRodInfo: disolvedRodInfos) {
+                  edgeRodInfo.mObject.Get<Comp::Mesh>().mVisible = false;
+                }
+                for (auto& edgeRodInfo: expandedRodInfos) {
+                  auto& transform = edgeRodInfo.mObject.Get<Comp::Transform>();
+                  transform.SetTranslation(
+                    edgeRodInfo.mEdgeCenter + edgeRodInfo.mRodSpan / 2.0f);
+                  transform.SetScale(
+                    {Math::Magnitude(edgeRodInfo.mRodSpan), 0.5f, 0.5f});
+                }
+              }
+              if (dir == Sequence::Cross::Out) {
+                for (auto& edgeRodInfo: disolvedRodInfos) {
+                  edgeRodInfo.mObject.Get<Comp::Mesh>().mVisible = true;
+                }
+              }
+            },
+        });
+        // !Animation //////////////////////////////////////////////////////////
       }
     };
 
@@ -1094,61 +1143,63 @@ Result Hull::QuickHull(const Ds::Vector<Vec3>& points, Video* vid) {
       }
     }
 
-    seq.Add({
-      .mName = "FadeMergedColoredRodsToMergedRodColor",
-      .mDuration = 1.0f,
-      .mEase = EaseType::Linear,
-      .mBegin =
-        [=](Sequence::Cross dir) {
-          for (const auto& info: mergedRodInfos) {
-            auto& mesh = info.mObject.Get<Comp::Mesh>();
-            if (dir == Sequence::Cross::In) {
-              mesh.mMaterialId = "QuickHull/asset:MergedRodColor";
+    if (!mergedRodInfos.Empty()) {
+      seq.Add({
+        .mName = "FadeMergedColoredRodsToMergedRodColor",
+        .mDuration = 1.0f,
+        .mEase = EaseType::Linear,
+        .mBegin =
+          [=](Sequence::Cross dir) {
+            for (const auto& info: mergedRodInfos) {
+              auto& mesh = info.mObject.Get<Comp::Mesh>();
+              if (dir == Sequence::Cross::In) {
+                mesh.mMaterialId = "QuickHull/asset:MergedRodColor";
+              }
+              else {
+                mesh.mMaterialId = "QuickHull/asset:RodColor";
+              }
             }
-            else {
-              mesh.mMaterialId = "QuickHull/asset:RodColor";
-            }
-          }
-        },
-      .mLerp =
-        [=](float t) {
-          Rsl::GetRes<Gfx::Material>("QuickHull/asset:MergedRodColor")
-            .Get<Vec4>("uColor") = Lerp(rodColor, mergedRodColor, t);
-        },
-    });
-    seq.Wait();
+          },
+        .mLerp =
+          [=](float t) {
+            Rsl::GetRes<Gfx::Material>("QuickHull/asset:MergedRodColor")
+              .Get<Vec4>("uColor") = Lerp(rodColor, mergedRodColor, t);
+          },
+      });
+      seq.Wait();
 
-    seq.Add({
-      .mName = "RemoveMergedRods",
-      .mDuration = 1.0f,
-      .mEase = EaseType::Linear,
-      .mLerp =
-        [=](float t) {
-          for (const auto& info: mergedRodInfos) {
-            auto& transform = info.mObject.Get<Comp::Transform>();
-            Vec3 rodEnd = info.mVertexPosition - (1.0f - t) * info.mRodSpan;
-            Vec3 rodCenter = (info.mVertexPosition + rodEnd) / 2.0f;
-            transform.SetTranslation(rodCenter);
-            Vec3 currentRodSpan = rodEnd - info.mVertexPosition;
-            transform.SetScale({Math::Magnitude(currentRodSpan), 0.5f, 0.5f});
-          }
-        },
-      .mEnd =
-        [=](Sequence::Cross dir) {
-          for (const auto& info: mergedRodInfos) {
-            auto& mesh = info.mObject.Get<Comp::Mesh>();
-            if (dir == Sequence::Cross::In) {
-              mesh.mMaterialId = "QuickHull/asset:MergedRodColor";
+      seq.Add({
+        .mName = "RemoveMergedRods",
+        .mDuration = 1.0f,
+        .mEase = EaseType::Linear,
+        .mLerp =
+          [=](float t) {
+            for (const auto& info: mergedRodInfos) {
+              auto& transform = info.mObject.Get<Comp::Transform>();
+              Vec3 rodEnd = info.mVertexPosition - (1.0f - t) * info.mRodSpan;
+              Vec3 rodCenter = (info.mVertexPosition + rodEnd) / 2.0f;
+              transform.SetTranslation(rodCenter);
+              Vec3 currentRodSpan = rodEnd - info.mVertexPosition;
+              transform.SetScale({Math::Magnitude(currentRodSpan), 0.5f, 0.5f});
             }
-            else {
-              mesh.mMaterialId = "QuickHull/asset:RodColor";
+          },
+        .mEnd =
+          [=](Sequence::Cross dir) {
+            for (const auto& info: mergedRodInfos) {
+              auto& mesh = info.mObject.Get<Comp::Mesh>();
+              if (dir == Sequence::Cross::In) {
+                mesh.mMaterialId = "QuickHull/asset:MergedRodColor";
+              }
+              else {
+                mesh.mMaterialId = "QuickHull/asset:RodColor";
+              }
             }
-          }
-          Rsl::GetRes<Gfx::Material>("QuickHull/asset:MergedRodColor")
-            .Get<Vec4>("uColor") = mergedRodColor;
-        },
-    });
-    seq.Wait();
+            Rsl::GetRes<Gfx::Material>("QuickHull/asset:MergedRodColor")
+              .Get<Vec4>("uColor") = mergedRodColor;
+          },
+      });
+      seq.Wait();
+    }
     // !Animation //////////////////////////////////////////////////////////////
 
     for (const Ds::List<Vertex>::Iter& vertIt: mergedVerts) {
