@@ -584,6 +584,8 @@ Result Hull::AnimateQuickHull(const AnimationParams& params) {
             mesh.mMaterialId = "QuickHull/asset:RodColor";
           }
         }
+        Rsl::GetRes<Gfx::Material>("QuickHull/asset:AddedRodColor")
+          .Get<Vec4>("uColor") = smAddedRodColor;
         for (const Vec3& pos: initialVertexPositions) {
           World::Object vertexSphere = vertexSpheres.Find(pos)->mValue;
           auto& mesh = vertexSphere.Get<Comp::Mesh>();
