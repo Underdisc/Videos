@@ -1210,6 +1210,10 @@ Result Hull::AnimateQuickHull(const AnimationParams& params) {
         edgeRodInfos.Remove(edgeTwins[1]);
 
         Ds::List<HalfEdge>::CIter expandedEdgeIts[] = {edges[0], edgeTwins[0]};
+        EdgeRodInfo beforeExpansionRodInfos[2] = {
+          edgeRodInfos.Find(expandedEdgeIts[0])->mValue,
+          edgeRodInfos.Find(expandedEdgeIts[1])->mValue,
+        };
         Ds::Vector<EdgeRodInfo> expandedRodInfos;
         for (int i = 0; i < 2; ++i) {
           Ds::List<HalfEdge>::CIter expandedEdgeIt = expandedEdgeIts[i];
@@ -1243,6 +1247,13 @@ Result Hull::AnimateQuickHull(const AnimationParams& params) {
               if (dir == Sequence::Cross::Out) {
                 for (auto& edgeRodInfo: disolvedRodInfos) {
                   edgeRodInfo.mObject.Get<Comp::Mesh>().mVisible = true;
+                }
+                for (auto& edgeRodInfo: beforeExpansionRodInfos) {
+                  auto& transform = edgeRodInfo.mObject.Get<Comp::Transform>();
+                  transform.SetTranslation(
+                    edgeRodInfo.mEdgeCenter + edgeRodInfo.mRodSpan / 2.0f);
+                  transform.SetScale(
+                    {Math::Magnitude(edgeRodInfo.mRodSpan), 0.5f, 0.5f});
                 }
               }
             },
