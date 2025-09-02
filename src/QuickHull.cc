@@ -529,14 +529,25 @@ Result Hull::AnimateQuickHull(const AnimationParams& params) {
   Ds::HashMap<Ds::List<HalfEdge>::CIter, EdgeRodInfo> edgeRodInfos;
   createEdgeRods(newRodEdgeIters, &edgeRodInfos);
 
+  // We get the information of one rod for each initial edge pair. We will only
+  // animate these sole rods to start.
+  EdgeRodInfo initialSoleRods[6] = {
+    edgeRodInfos.Find(edges[0])->mValue,
+    edgeRodInfos.Find(edges[1])->mValue,
+    edgeRodInfos.Find(edges[2])->mValue,
+    edgeRodInfos.Find(edges[5])->mValue,
+    edgeRodInfos.Find(edges[8])->mValue,
+    edgeRodInfos.Find(edges[11])->mValue,
+  };
+
   seq.AddContinuousEvent({
     .mName = "CreateInitialRods",
     .mDuration = 1.0f,
     .mEase = EaseType::Linear,
     .mBegin =
       [=](Sequence::Cross dir) {
-        for (const auto& info: edgeRodInfos) {
-          auto& mesh = info.mValue.mObject.Get<Comp::Mesh>();
+        for (const auto& info: initialSoleRods) {
+          auto& mesh = info.mObject.Get<Comp::Mesh>();
           if (dir == Sequence::Cross::In) {
             mesh.mVisible = true;
             mesh.mMaterialId = "QuickHull/asset:AddedRodColor";
@@ -549,15 +560,41 @@ Result Hull::AnimateQuickHull(const AnimationParams& params) {
       },
     .mLerp =
       [=](float t) {
-        for (const auto& info: edgeRodInfos) {
-          auto& transform = info.mValue.mObject.Get<Comp::Transform>();
-          Quat orientation = Quat::FromTo({1, 0, 0}, info.mValue.mRodSpan);
+        for (const auto& info: initialSoleRods) {
+          auto& transform = info.mObject.Get<Comp::Transform>();
+          Quat orientation = Quat::FromTo({1, 0, 0}, info.mRodSpan);
           transform.SetRotation(orientation);
-          Vec3 rodEnd = info.mValue.mEdgeCenter + t * info.mValue.mRodSpan;
-          Vec3 rodCenter = (info.mValue.mEdgeCenter + rodEnd) / 2.0f;
+          Vec3 rodEnd = info.mVertexPosition - 2.0f * t * info.mRodSpan;
+          Vec3 rodCenter = (info.mVertexPosition + rodEnd) / 2.0f;
           transform.SetTranslation(rodCenter);
-          Vec3 currentRodSpan = rodEnd - info.mValue.mEdgeCenter;
+          Vec3 currentRodSpan = rodEnd - info.mVertexPosition;
           transform.SetScale({Math::Magnitude(currentRodSpan), 0.5f, 0.5f});
+        }
+      },
+    .mEnd =
+      [=](Sequence::Cross dir) {
+        if (dir == Sequence::Cross::In) {
+          for (const auto& info: edgeRodInfos) {
+            info.mValue.mObject.Get<Comp::Mesh>().mVisible = false;
+          }
+          for (const auto& info: initialSoleRods) {
+            info.mObject.Get<Comp::Mesh>().mVisible = true;
+          }
+        }
+        else {
+          for (const auto& info: edgeRodInfos) {
+            auto& mesh = info.mValue.mObject.Get<Comp::Mesh>();
+            mesh.mVisible = true;
+            mesh.mMaterialId = "QuickHull/asset:AddedRodColor";
+            auto& transform = info.mValue.mObject.Get<Comp::Transform>();
+            Quat orientation = Quat::FromTo({1, 0, 0}, info.mValue.mRodSpan);
+            transform.SetRotation(orientation);
+            Vec3 rodEnd = info.mValue.mEdgeCenter + info.mValue.mRodSpan;
+            Vec3 rodCenter = (info.mValue.mEdgeCenter + rodEnd) / 2.0f;
+            transform.SetTranslation(rodCenter);
+            transform.SetScale(
+              {Math::Magnitude(info.mValue.mRodSpan), 0.5f, 0.5f});
+          }
         }
       },
   });
@@ -845,7 +882,9 @@ Result Hull::AnimateQuickHull(const AnimationParams& params) {
           for (const auto& info: newEdgeRodInfos) {
             auto& mesh = info.mValue.mObject.Get<Comp::Mesh>();
             if (dir == Sequence::Cross::In) {
-              mesh.mVisible = true;
+              if (info.mValue.mVertexPosition == newPoint) {
+                mesh.mVisible = true;
+              }
               mesh.mMaterialId = "QuickHull/asset:AddedRodColor";
             }
             else {
@@ -857,15 +896,39 @@ Result Hull::AnimateQuickHull(const AnimationParams& params) {
       .mLerp =
         [=](float t) {
           for (const auto& info: newEdgeRodInfos) {
-            auto& transform = info.mValue.mObject.Get<Comp::Transform>();
-            Quat orientation = Quat::FromTo({1, 0, 0}, info.mValue.mRodSpan);
-            transform.SetRotation(orientation);
-            Vec3 rodEnd =
-              info.mValue.mVertexPosition - t * info.mValue.mRodSpan;
-            Vec3 rodCenter = (info.mValue.mVertexPosition + rodEnd) / 2.0f;
-            transform.SetTranslation(rodCenter);
-            Vec3 currentRodSpan = rodEnd - info.mValue.mVertexPosition;
-            transform.SetScale({Math::Magnitude(currentRodSpan), 0.5f, 0.5f});
+            if (info.mValue.mVertexPosition == newPoint) {
+              auto& transform = info.mValue.mObject.Get<Comp::Transform>();
+              Quat orientation = Quat::FromTo({1, 0, 0}, info.mValue.mRodSpan);
+              transform.SetRotation(orientation);
+              Vec3 rodEnd =
+                info.mValue.mVertexPosition - 2.0f * t * info.mValue.mRodSpan;
+              Vec3 rodCenter = (info.mValue.mVertexPosition + rodEnd) / 2.0f;
+              transform.SetTranslation(rodCenter);
+              Vec3 currentRodSpan = rodEnd - info.mValue.mVertexPosition;
+              transform.SetScale({Math::Magnitude(currentRodSpan), 0.5f, 0.5f});
+            }
+          }
+        },
+      .mEnd =
+        [=](Sequence::Cross dir) {
+          for (const auto& info: newEdgeRodInfos) {
+            auto& mesh = info.mValue.mObject.Get<Comp::Mesh>();
+            if (dir == Sequence::Cross::In) {
+              if (info.mValue.mVertexPosition != newPoint) {
+                mesh.mVisible = false;
+              }
+            }
+            else {
+              auto& transform = info.mValue.mObject.Get<Comp::Transform>();
+              Quat orientation = Quat::FromTo({1, 0, 0}, info.mValue.mRodSpan);
+              transform.SetRotation(orientation);
+              Vec3 rodEnd = info.mValue.mVertexPosition - info.mValue.mRodSpan;
+              Vec3 rodCenter = (info.mValue.mVertexPosition + rodEnd) / 2.0f;
+              transform.SetTranslation(rodCenter);
+              transform.SetScale(
+                {Math::Magnitude(info.mValue.mRodSpan), 0.5f, 0.5f});
+              mesh.mVisible = true;
+            }
           }
         },
     });
