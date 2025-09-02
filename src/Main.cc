@@ -46,7 +46,7 @@ int main(int argc, char* argv[]) {
   Result result = VarkorInit(argc, argv, std::move(config));
   LogAbortIf(!result.Success(), result.mError.c_str());
 
-  result = QuickHull(&gVid);
+  result = QuickHullAnimation(&gVid);
   LogAbortIf(!result.Success(), result.mError.c_str());
   World::nCentralUpdate = CentralUpdate;
   Editor::nExtension = EditorExtension;

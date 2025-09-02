@@ -39,33 +39,44 @@ float Ease(float t, EaseType easeType) {
   return t;
 }
 
-void Sequence::Event::Run(float t) const {
+void Sequence::DiscreteEvent::Run(float t) const {
   if (mLerp) {
     t = Ease(t, mEase);
     mLerp(t);
   }
 }
 
-void Sequence::Add(const AddOptions& ao) {
-  Event newEvent;
-  newEvent.mName = ao.mName;
+void Sequence::AddDiscreteEvent(const DiscreteEvent& newDiscreteEvent) {
+  for (int i = 0; i < mEvents.Size(); ++i) {
+    const DiscreteEvent& discreteEvent = mEvents[i];
+    if (newDiscreteEvent.mStartTime < discreteEvent.mStartTime) {
+      mEvents.Insert(i, newDiscreteEvent);
+      return;
+    }
+  }
+  mEvents.Push(newDiscreteEvent);
+}
+
+void Sequence::AddContinuousEvent(const ContinuousEvent& newContinuousEvent) {
+  DiscreteEvent newEvent;
+  newEvent.mName = newContinuousEvent.mName;
   if (mEvents.Size() == 0) {
     newEvent.mStartTime = 0.0f;
   }
   else {
     newEvent.mStartTime = mEvents.Top().mStartTime;
   }
-  newEvent.mEndTime = newEvent.mStartTime + ao.mDuration;
-  newEvent.mEase = ao.mEase;
-  newEvent.mBegin = ao.mBegin;
-  newEvent.mLerp = ao.mLerp;
-  newEvent.mEnd = ao.mEnd;
+  newEvent.mEndTime = newEvent.mStartTime + newContinuousEvent.mDuration;
+  newEvent.mEase = newContinuousEvent.mEase;
+  newEvent.mBegin = newContinuousEvent.mBegin;
+  newEvent.mLerp = newContinuousEvent.mLerp;
+  newEvent.mEnd = newContinuousEvent.mEnd;
   mEvents.Push(newEvent);
   mTotalTime = newEvent.mEndTime;
 }
 
 void Sequence::Gap(float duration) {
-  Event newEvent;
+  DiscreteEvent newEvent;
   newEvent.mName = "Gap";
   if (mEvents.Size() == 0) {
     newEvent.mStartTime = duration;
@@ -99,7 +110,7 @@ void Sequence::ScrubUp(float scrubTime) {
 
   // Activate any events that haven't started.
   while (mNextInactiveEvent < mEvents.Size()) {
-    const Event& event = mEvents[mNextInactiveEvent];
+    const DiscreteEvent& event = mEvents[mNextInactiveEvent];
     if (scrubTime < event.mStartTime) {
       break;
     }
@@ -110,7 +121,7 @@ void Sequence::ScrubUp(float scrubTime) {
   // Process all activated events and removed finished ones.
   Ds::Vector<unsigned int> remainingActiveEvents;
   for (int i = 0; i < mActiveEvents.Size(); ++i) {
-    const Event& event = mEvents[mActiveEvents[i]];
+    const DiscreteEvent& event = mEvents[mActiveEvents[i]];
     if (mTimePassed <= event.mStartTime) {
       if (event.mBegin) event.mBegin(Cross::In);
     }
@@ -142,7 +153,7 @@ void Sequence::ScrubDown(float scrubTime) {
   // Collect events that must be handled.
   mActiveEvents.Clear();
   for (int i = mNextInactiveEvent - 1; i >= 0; --i) {
-    const Event& event = mEvents[i];
+    const DiscreteEvent& event = mEvents[i];
     if (scrubTime > event.mEndTime) {
       continue;
     }
@@ -155,7 +166,7 @@ void Sequence::ScrubDown(float scrubTime) {
   // Handle the events and remove events which the scrub time is outside of.
   Ds::Vector<unsigned int> remainingActiveEvents;
   for (int i = 0; i < mActiveEvents.Size(); ++i) {
-    const Event& event = mEvents[mActiveEvents[i]];
+    const DiscreteEvent& event = mEvents[mActiveEvents[i]];
     if (mTimePassed >= event.mEndTime) {
       if (event.mEnd) event.mEnd(Cross::In);
     }

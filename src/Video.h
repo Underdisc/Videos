@@ -29,7 +29,8 @@ struct Sequence {
     In,
     Out,
   };
-  struct Event {
+
+  struct DiscreteEvent {
     std::string mName;
     float mStartTime;
     float mEndTime;
@@ -40,7 +41,7 @@ struct Sequence {
     void Run(float t) const;
   };
 
-  struct AddOptions {
+  struct ContinuousEvent {
     std::string mName;
     float mDuration;
     EaseType mEase;
@@ -48,7 +49,9 @@ struct Sequence {
     std::function<void(float t)> mLerp;
     std::function<void(Cross dir)> mEnd;
   };
-  void Add(const AddOptions& options);
+
+  void AddDiscreteEvent(const DiscreteEvent& event);
+  void AddContinuousEvent(const ContinuousEvent& event);
   void Gap(float duration);
   void Wait();
 
@@ -65,7 +68,7 @@ struct Sequence {
   // The total duration of the sequence.
   float mTotalTime;
   unsigned int mNextInactiveEvent;
-  Ds::Vector<Event> mEvents;
+  Ds::Vector<DiscreteEvent> mEvents;
   Ds::Vector<unsigned int> mActiveEvents;
 };
 

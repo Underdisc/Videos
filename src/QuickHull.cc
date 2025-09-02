@@ -8,6 +8,7 @@
 #include <gfx/Material.h>
 #include <gfx/Mesh.h>
 #include <math/Constants.h>
+#include <math/Matrix4.h>
 #include <math/Plane.h>
 #include <math/Ray.h>
 #include <math/Utility.h>
@@ -41,7 +42,13 @@ struct Hull {
   Ds::List<HalfEdge> mHalfEdges;
   Ds::List<Face> mFaces;
 
-  static Result QuickHull(const Ds::Vector<Vec3>& points, Video* vid);
+  struct AnimationParams {
+    Ds::Vector<Vec3> mPoints;
+    Mat4 mTransform;
+    float mCameraDistance;
+    Video* mVideo;
+  };
+  static Result AnimateQuickHull(const AnimationParams& params);
 
   static void CreateResources();
   static const Vec4 smVertexColor;
@@ -123,7 +130,14 @@ Vec3 Hull::Face::Center() const {
   return center / (float)count;
 }
 
-Result Hull::QuickHull(const Ds::Vector<Vec3>& points, Video* vid) {
+Result Hull::AnimateQuickHull(const AnimationParams& params) {
+  // Animation /////////////////////////////////////////////////////////////////
+  Ds::Vector<Vec3> points;
+  for (const Vec3& point: params.mPoints) {
+    points.Push(Vec3(params.mTransform * Vec4(point, 1)));
+  }
+  // !Animation ////////////////////////////////////////////////////////////////
+
   // The extreme points are organised like so: x, y, z, -x, -y, -z.
   const Vec3* extremePoints[6] = {&points[0]};
   for (int i = 0; i < 6; ++i) {
@@ -332,8 +346,8 @@ Result Hull::QuickHull(const Ds::Vector<Vec3>& points, Video* vid) {
   }
 
   // Animation /////////////////////////////////////////////////////////////////
-  World::Space& space = vid->mLayerIt->mSpace;
-  Sequence& seq = vid->mSeq;
+  World::Space& space = params.mVideo->mLayerIt->mSpace;
+  Sequence& seq = params.mVideo->mSeq;
   constexpr float vertexSphereScale = 1.0f / 20.0f;
   Ds::HashMap<Vec3, World::Object> vertexSpheres;
   World::Object parentObject = space.CreateObject();
@@ -349,19 +363,45 @@ Result Hull::QuickHull(const Ds::Vector<Vec3>& points, Video* vid) {
     transform.SetUniformScale(0.0f);
   }
 
-  seq.Add({
+  struct CameraInfo {
+    float mAnimationStartTime;
+    float mPotentialVerticesGrowInEndTime;
+    float mQuickHullEndTime;
+    float mFadeOutEndTime;
+    float mWs, mWc, mWd;
+    float StartTheta(float t) const {
+      float d = mPotentialVerticesGrowInEndTime - mAnimationStartTime;
+      t *= d;
+      return mWd * t * t * t / (3.0f * d * d) - (mWd * t * t) / d + mWs * t;
+    }
+    float EndTheta(float t) const {
+      float d = mFadeOutEndTime - mQuickHullEndTime;
+      t *= d;
+      return mWd * t * t * t / (3.0f * d * d) + mWc * t;
+    }
+  };
+  CameraInfo cameraInfo = {
+    .mWs = Math::nTau * 3.0f,
+    .mWc = Math::nTau / 7.0f,
+  };
+  cameraInfo.mWd = cameraInfo.mWs - cameraInfo.mWc;
+  cameraInfo.mAnimationStartTime = seq.mTotalTime;
+
+  seq.AddContinuousEvent({
     .mName = "CreateAllPotentialVetices",
-    .mDuration = 1.0f,
-    .mEase = EaseType::Linear,
+    .mDuration = 0.5f,
+    .mEase = EaseType::QuadIn,
     .mBegin =
       [=](Sequence::Cross dir) {
         for (const auto& vsIt: vertexSpheres) {
           auto& mesh = vsIt.mValue.Get<Comp::Mesh>();
           if (dir == Sequence::Cross::In) {
             mesh.mVisible = true;
+            mesh.mMaterialId = "QuickHull/asset:PulseColor";
           }
           else {
             mesh.mVisible = false;
+            mesh.mMaterialId = "QuickHull/asset:VertexColor";
           }
         }
       },
@@ -371,9 +411,52 @@ Result Hull::QuickHull(const Ds::Vector<Vec3>& points, Video* vid) {
           vsIt.mValue.Get<Comp::Transform>().SetUniformScale(
             t * vertexSphereScale);
         }
+        Rsl::GetRes<Gfx::Material>("QuickHull/asset:PulseColor")
+          .Get<Vec4>("uColor") = Lerp(smVertexColor, smPulseColor, t);
       },
   });
   seq.Wait();
+  seq.AddContinuousEvent({
+    .mName = "FadePotentialVerticesPulseColor",
+    .mDuration = 2.0f,
+    .mEase = EaseType::FlattenedCubic,
+    .mLerp =
+      [=](float t) {
+        Rsl::GetRes<Gfx::Material>("QuickHull/asset:PulseColor")
+          .Get<Vec4>("uColor") = Lerp(smPulseColor, smVertexColor, t);
+      },
+    .mEnd =
+      [=](Sequence::Cross dir) {
+        for (const auto& vsIt: vertexSpheres) {
+          auto& mesh = vsIt.mValue.Get<Comp::Mesh>();
+          if (dir == Sequence::Cross::In) {
+            mesh.mMaterialId = "QuickHull/asset:PulseColor";
+          }
+          else {
+            mesh.mMaterialId = "QuickHull/asset:VertexColor";
+          }
+        }
+      },
+  });
+  seq.Wait();
+
+  cameraInfo.mPotentialVerticesGrowInEndTime = seq.mTotalTime;
+  World::Object cameraObject(&space, params.mVideo->mLayerIt->mCameraId);
+  seq.AddDiscreteEvent({
+    .mName = "SpinCameraFast",
+    .mStartTime = cameraInfo.mAnimationStartTime,
+    .mEndTime = cameraInfo.mPotentialVerticesGrowInEndTime,
+    .mEase = EaseType::Linear,
+    .mLerp =
+      [=](float t) {
+        float theta = cameraInfo.StartTheta(t);
+        float camDist = params.mCameraDistance;
+        cameraObject.Get<Comp::Transform>().SetTranslation(
+          {std::sinf(theta) * camDist, 0.0f, std::cosf(theta) * camDist});
+        cameraObject.Get<Comp::Camera>().WorldLookAt(
+          {0, 0, 0}, {0, 1, 0}, cameraObject);
+      },
+  });
 
   Ds::Vector<Vec3> initialVertexPositions;
   for (auto vertIt = hull.mVertices.cbegin(); vertIt != hull.mVertices.cend();
@@ -381,7 +464,7 @@ Result Hull::QuickHull(const Ds::Vector<Vec3>& points, Video* vid) {
     initialVertexPositions.Push(vertIt->mPosition);
   }
 
-  seq.Add({
+  seq.AddContinuousEvent({
     .mName = "HighlightInitialVertices",
     .mDuration = 1.0f,
     .mEase = EaseType::Linear,
@@ -446,7 +529,7 @@ Result Hull::QuickHull(const Ds::Vector<Vec3>& points, Video* vid) {
   Ds::HashMap<Ds::List<HalfEdge>::CIter, EdgeRodInfo> edgeRodInfos;
   createEdgeRods(newRodEdgeIters, &edgeRodInfos);
 
-  seq.Add({
+  seq.AddContinuousEvent({
     .mName = "CreateInitialRods",
     .mDuration = 1.0f,
     .mEase = EaseType::Linear,
@@ -480,7 +563,7 @@ Result Hull::QuickHull(const Ds::Vector<Vec3>& points, Video* vid) {
   });
   seq.Wait();
 
-  seq.Add({
+  seq.AddContinuousEvent({
     .mName = "FadeAwayInitialAddedColors",
     .mDuration = 1.0f,
     .mEase = EaseType::Linear,
@@ -515,7 +598,7 @@ Result Hull::QuickHull(const Ds::Vector<Vec3>& points, Video* vid) {
   });
   seq.Wait();
 
-  seq.Add({
+  seq.AddContinuousEvent({
     .mName = "HighlightRemovedVertices",
     .mDuration = 1.0f,
     .mEase = EaseType::Linear,
@@ -540,7 +623,7 @@ Result Hull::QuickHull(const Ds::Vector<Vec3>& points, Video* vid) {
   });
   seq.Wait();
 
-  seq.Add({
+  seq.AddContinuousEvent({
     .mName = "RemoveRemovedVertexSpheres",
     .mDuration = 1.0f,
     .mEase = EaseType::Linear,
@@ -728,7 +811,7 @@ Result Hull::QuickHull(const Ds::Vector<Vec3>& points, Video* vid) {
       edgeRodInfos.Remove(rodInfoIt);
     }
 
-    seq.Add({
+    seq.AddContinuousEvent({
       .mName = "HighlightNewVertex",
       .mDuration = 1.0f,
       .mEase = EaseType::Linear,
@@ -751,7 +834,7 @@ Result Hull::QuickHull(const Ds::Vector<Vec3>& points, Video* vid) {
     });
     seq.Wait();
 
-    seq.Add({
+    seq.AddContinuousEvent({
       .mName = "CreateNewEdgeRods",
       .mDuration = 1.0f,
       .mEase = EaseType::Linear,
@@ -786,7 +869,7 @@ Result Hull::QuickHull(const Ds::Vector<Vec3>& points, Video* vid) {
     });
     seq.Wait();
 
-    seq.Add({
+    seq.AddContinuousEvent({
       .mName = "FadeAddedColors",
       .mDuration = 1.0f,
       .mEase = EaseType::Linear,
@@ -874,7 +957,7 @@ Result Hull::QuickHull(const Ds::Vector<Vec3>& points, Video* vid) {
     }
 
     if (!removedRodInfos.Empty()) {
-      seq.Add({
+      seq.AddContinuousEvent({
         .mName = "FadeRemoveColoredRodsToRemovedRodColor",
         .mDuration = 1.0f,
         .mEase = EaseType::Linear,
@@ -898,7 +981,7 @@ Result Hull::QuickHull(const Ds::Vector<Vec3>& points, Video* vid) {
       });
       seq.Wait();
 
-      seq.Add({
+      seq.AddContinuousEvent({
         .mName = "RemoveCoveredRods",
         .mDuration = 1.0f,
         .mEase = EaseType::Linear,
@@ -1075,7 +1158,7 @@ Result Hull::QuickHull(const Ds::Vector<Vec3>& points, Video* vid) {
           expandedRodInfos.Push(edgeRodInfo);
         }
 
-        seq.Add({
+        seq.AddContinuousEvent({
           .mName = "HandleColinearMerge",
           .mDuration = 0.0f,
           .mBegin =
@@ -1174,7 +1257,7 @@ Result Hull::QuickHull(const Ds::Vector<Vec3>& points, Video* vid) {
     }
 
     if (!mergedRodInfos.Empty()) {
-      seq.Add({
+      seq.AddContinuousEvent({
         .mName = "FadeMergedColoredRodsToMergedRodColor",
         .mDuration = 1.0f,
         .mEase = EaseType::Linear,
@@ -1198,7 +1281,7 @@ Result Hull::QuickHull(const Ds::Vector<Vec3>& points, Video* vid) {
       });
       seq.Wait();
 
-      seq.Add({
+      seq.AddContinuousEvent({
         .mName = "RemoveMergedRods",
         .mDuration = 1.0f,
         .mEase = EaseType::Linear,
@@ -1257,7 +1340,7 @@ Result Hull::QuickHull(const Ds::Vector<Vec3>& points, Video* vid) {
     }
 
     // Animation ///////////////////////////////////////////////////////////////
-    seq.Add({
+    seq.AddContinuousEvent({
       .mName = "HighlightRemovedVertices",
       .mDuration = 1.0f,
       .mEase = EaseType::Linear,
@@ -1282,7 +1365,7 @@ Result Hull::QuickHull(const Ds::Vector<Vec3>& points, Video* vid) {
     });
     seq.Wait();
 
-    seq.Add({
+    seq.AddContinuousEvent({
       .mName = "RemoveRemovedVertexSpheres",
       .mDuration = 1.0f,
       .mEase = EaseType::Linear,
@@ -1317,7 +1400,28 @@ Result Hull::QuickHull(const Ds::Vector<Vec3>& points, Video* vid) {
   }
 
   // Animation /////////////////////////////////////////////////////////////////
-  seq.Add({
+  cameraInfo.mQuickHullEndTime = seq.mTotalTime;
+  seq.AddDiscreteEvent({
+    .mName = "ContinuousCameraRotation",
+    .mStartTime = cameraInfo.mPotentialVerticesGrowInEndTime,
+    .mEndTime = cameraInfo.mQuickHullEndTime,
+    .mEase = EaseType::Linear,
+    .mLerp =
+      [=](float t) {
+        auto& transform = cameraObject.Get<Comp::Transform>();
+        float timespan = cameraInfo.mQuickHullEndTime -
+          cameraInfo.mPotentialVerticesGrowInEndTime;
+        float timeElapsed = timespan * t;
+        float theta = cameraInfo.StartTheta(1) + timeElapsed * cameraInfo.mWc;
+        float camDist = params.mCameraDistance;
+        transform.SetTranslation(
+          {std::sinf(theta) * camDist, 0.0f, std::cosf(theta) * camDist});
+        cameraObject.Get<Comp::Camera>().WorldLookAt(
+          {0, 0, 0}, {0, 1, 0}, cameraObject);
+      },
+  });
+
+  seq.AddContinuousEvent({
     .mName = "PulseBloomRemainingElements",
     .mDuration = 1.0f,
     .mEase = EaseType::Linear,
@@ -1341,7 +1445,7 @@ Result Hull::QuickHull(const Ds::Vector<Vec3>& points, Video* vid) {
   });
   seq.Wait();
 
-  seq.Add({
+  seq.AddContinuousEvent({
     .mName = "VanishRemainingElements",
     .mDuration = 1.0f,
     .mEase = EaseType::Linear,
@@ -1366,57 +1470,107 @@ Result Hull::QuickHull(const Ds::Vector<Vec3>& points, Video* vid) {
       },
   });
   seq.Wait();
+
+  cameraInfo.mFadeOutEndTime = seq.mTotalTime;
+  seq.AddDiscreteEvent({
+    .mName = "SpinCameraFastEnd",
+    .mStartTime = cameraInfo.mQuickHullEndTime,
+    .mEndTime = cameraInfo.mFadeOutEndTime,
+    .mEase = EaseType::Linear,
+    .mLerp =
+      [=](float t) {
+        auto& transform = cameraObject.Get<Comp::Transform>();
+        float timespan = cameraInfo.mQuickHullEndTime -
+          cameraInfo.mPotentialVerticesGrowInEndTime;
+        float theta = cameraInfo.StartTheta(1) + timespan * cameraInfo.mWc +
+          cameraInfo.EndTheta(t);
+        float camDist = params.mCameraDistance;
+        transform.SetTranslation(
+          {std::sinf(theta) * camDist, 0.0f, std::cosf(theta) * camDist});
+        cameraObject.Get<Comp::Camera>().WorldLookAt(
+          {0, 0, 0}, {0, 1, 0}, cameraObject);
+      },
+  });
   // !Animation ////////////////////////////////////////////////////////////////
 
   return Result();
 }
 
-Result QuickHull(Video* video) {
+Result QuickHullAnimation(Video* video) {
   video->mLayerIt = World::nLayers.EmplaceBack("QuickHull");
   World::Space& space = video->mLayerIt->mSpace;
   World::Object camera = space.CreateObject();
   Comp::Camera& cameraComp = camera.Add<Comp::Camera>();
   cameraComp.mProjectionType = Comp::Camera::ProjectionType::Perspective;
-  cameraComp.mFov = 95.0f;
-  cameraComp.mHeight = 10.0f;
+  cameraComp.mFov = Math::nPi * (9.8f / 18.0f);
   Comp::Transform& cameraTransform = camera.Get<Comp::Transform>();
   cameraTransform.SetTranslation({0.0f, 0.0f, 10.0f});
-  cameraComp.LocalLookAt({0.0f, 0.0f, 0.0f}, {0.0f, 1.0f, 0.0f}, camera);
+  cameraComp.WorldLookAt({0.0f, 0.0f, 0.0f}, {0.0f, 1.0f, 0.0f}, camera);
   video->mLayerIt->mCameraId = camera.mMemberId;
 
-  // Collect the point clouds that we'll animate over.
-  Ds::Vector<Ds::Vector<Vec3>> pointClouds;
-  Ds::Vector<Vec3> points;
+  // Collect the point clouds that we'll animate quick hull on.
+  // Cube
+  Ds::Vector<Hull::AnimationParams> allParams;
+  Hull::AnimationParams params = {.mVideo = video};
   float heights[4] = {-1, -0.5f, 0.5f, 1};
   for (int i = 0; i < 4; ++i) {
-    points.Push({1, heights[i], -1});
-    points.Push({1, heights[i], -0.5f});
-    points.Push({1, heights[i], 0.5f});
-    points.Push({1, heights[i], 1});
-    points.Push({0.5f, heights[i], 1});
-    points.Push({-0.5f, heights[i], 1});
-    points.Push({-1, heights[i], 1});
-    points.Push({-1, heights[i], 0.5f});
-    points.Push({-1, heights[i], -0.5f});
-    points.Push({-1, heights[i], -1});
-    points.Push({-0.5f, heights[i], -1});
-    points.Push({0.5f, heights[i], -1});
+    params.mPoints.Push({1, heights[i], -1});
+    params.mPoints.Push({1, heights[i], -0.5f});
+    params.mPoints.Push({1, heights[i], 0.5f});
+    params.mPoints.Push({1, heights[i], 1});
+    params.mPoints.Push({0.5f, heights[i], 1});
+    params.mPoints.Push({-0.5f, heights[i], 1});
+    params.mPoints.Push({-1, heights[i], 1});
+    params.mPoints.Push({-1, heights[i], 0.5f});
+    params.mPoints.Push({-1, heights[i], -0.5f});
+    params.mPoints.Push({-1, heights[i], -1});
+    params.mPoints.Push({-0.5f, heights[i], -1});
+    params.mPoints.Push({0.5f, heights[i], -1});
   }
-  pointClouds.Emplace(points);
+  Math::Scale(&params.mTransform, 2.0f);
+  params.mCameraDistance = 5.0f;
+  allParams.Emplace(std::move(params));
 
-  auto addMeshPoints = [&pointClouds](const char* meshFile, float scale) {
+  // Cylinder
+  for (int i = 0; i < 12; ++i) {
+    float theta = Math::nTau * (float)i / 12.0f;
+    params.mPoints.Push({1, std::sinf(theta), std::cosf(theta)});
+    params.mPoints.Push({-1, std::sinf(theta), std::cosf(theta)});
+  }
+  Mat4 scale, rotate;
+  Math::Scale(&scale, {1.5f, 2.0f, 2.0f});
+  Math::Rotate(&rotate, Quat::AngleAxis(Math::nPi * (2.0f / 4.0f), {0, 0, 1}));
+  params.mTransform = rotate * scale;
+  params.mCameraDistance = 3.8f;
+  allParams.Emplace(std::move(params));
+
+  auto fetchMeshPoints = [&params](const char* meshFile) {
     VResult<Gfx::Mesh::Local> result = Gfx::Mesh::Local::Init(
-      meshFile, Gfx::Mesh::Attribute::Position, false, scale);
+      meshFile, Gfx::Mesh::Attribute::Position, false, 1.0f);
     LogAbortIf(!result.Success(), result.mError.c_str());
-    pointClouds.Emplace(result.mValue.Points());
+    params.mPoints = std::move(result.mValue.Points());
   };
-  addMeshPoints("QuickHull/icepick.obj", 1.0f);
-  addMeshPoints("QuickHull/suzanne.obj", 1.0f);
 
-  // Create the animation sequences for the collected point clouds.
+  fetchMeshPoints("QuickHull/icepick.obj");
+  Mat4 translate;
+  Math::Scale(&scale, 3.5f);
+  Math::Rotate(&rotate, Quat::AngleAxis(Math::nPi * (2.0f / 4.0f), {0, 0, 1}));
+  Math::Translate(&translate, {-1.0f, -0.2f, 0});
+  params.mTransform = translate * rotate * scale;
+  params.mCameraDistance = 6.0f;
+  allParams.Emplace(std::move(params));
+
+  fetchMeshPoints("QuickHull/suzanne.obj");
+  Math::Scale(&scale, 4.0f);
+  Math::Translate(&translate, {0, -0.5f, 0});
+  params.mTransform = translate * scale;
+  params.mCameraDistance = 8.0f;
+  allParams.Emplace(std::move(params));
+
+  // Create the animation events for all of the point clouds.
   Hull::CreateResources();
-  for (const Ds::Vector<Vec3>& points: pointClouds) {
-    Result result = Hull::QuickHull(points, video);
+  for (const Hull::AnimationParams& params: allParams) {
+    Result result = Hull::AnimateQuickHull(params);
     if (!result.Success()) {
       return result;
     }

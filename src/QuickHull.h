@@ -5,6 +5,6 @@
 
 #include "Video.h"
 
-Result QuickHull(Video* video);
+Result QuickHullAnimation(Video* video);
 
 #endif
