@@ -348,7 +348,6 @@ Result Hull::AnimateQuickHull(const AnimationParams& params) {
   // Animation /////////////////////////////////////////////////////////////////
   World::Space& space = params.mVideo->mLayerIt->mSpace;
   Sequence& seq = params.mVideo->mSeq;
-  constexpr float vertexSphereScale = 1.0f / 20.0f;
   Ds::HashMap<Vec3, World::Object> vertexSpheres;
   World::Object parentObject = space.CreateObject();
   for (const Vec3& uniquePoint: uniquePoints) {
@@ -387,6 +386,11 @@ Result Hull::AnimateQuickHull(const AnimationParams& params) {
   cameraInfo.mWd = cameraInfo.mWs - cameraInfo.mWc;
   cameraInfo.mAnimationStartTime = seq.mTotalTime;
 
+  // The first value is for when the element is out of focus and the second is
+  // for when it's in focus (highlighted and undergoing an animation).
+  constexpr float sphereScales[2] = {0.03f, 0.065f};
+  constexpr float rodWidths[2] = {0.18f, 0.35f};
+
   seq.AddContinuousEvent({
     .mName = "CreateAllPotentialVetices",
     .mDuration = 0.5f,
@@ -409,7 +413,7 @@ Result Hull::AnimateQuickHull(const AnimationParams& params) {
       [=](float t) {
         for (const auto& vsIt: vertexSpheres) {
           vsIt.mValue.Get<Comp::Transform>().SetUniformScale(
-            t * vertexSphereScale);
+            t * sphereScales[1]);
         }
         Rsl::GetRes<Gfx::Material>("QuickHull/asset:PulseColor")
           .Get<Vec4>("uColor") = Lerp(smVertexColor, smPulseColor, t);
@@ -417,11 +421,15 @@ Result Hull::AnimateQuickHull(const AnimationParams& params) {
   });
   seq.Wait();
   seq.AddContinuousEvent({
-    .mName = "FadePotentialVerticesPulseColor",
+    .mName = "BringPotentialVerticesOutOfFocus",
     .mDuration = 2.0f,
     .mEase = EaseType::FlattenedCubic,
     .mLerp =
       [=](float t) {
+        const float sphereScale = Lerp(sphereScales[1], sphereScales[0], t);
+        for (const auto& vsIt: vertexSpheres) {
+          vsIt.mValue.Get<Comp::Transform>().SetUniformScale(sphereScale);
+        }
         Rsl::GetRes<Gfx::Material>("QuickHull/asset:PulseColor")
           .Get<Vec4>("uColor") = Lerp(smPulseColor, smVertexColor, t);
       },
@@ -465,7 +473,7 @@ Result Hull::AnimateQuickHull(const AnimationParams& params) {
   }
 
   seq.AddContinuousEvent({
-    .mName = "HighlightInitialVertices",
+    .mName = "BringInitialVerticesInFocus",
     .mDuration = 1.0f,
     .mEase = EaseType::Linear,
     .mBegin =
@@ -483,6 +491,11 @@ Result Hull::AnimateQuickHull(const AnimationParams& params) {
       },
     .mLerp =
       [=](float t) {
+        const float sphereScale = Lerp(sphereScales[0], sphereScales[1], t);
+        for (const Vec3& pos: initialVertexPositions) {
+          World::Object vertexSphere = vertexSpheres.Find(pos)->mValue;
+          vertexSphere.Get<Comp::Transform>().SetUniformScale(sphereScale);
+        }
         Rsl::GetRes<Gfx::Material>("QuickHull/asset:AddedVertexColor")
           .Get<Vec4>("uColor") = Lerp(smVertexColor, smAddedVertexColor, t);
       },
@@ -568,7 +581,8 @@ Result Hull::AnimateQuickHull(const AnimationParams& params) {
           Vec3 rodCenter = (info.mVertexPosition + rodEnd) / 2.0f;
           transform.SetTranslation(rodCenter);
           Vec3 currentRodSpan = rodEnd - info.mVertexPosition;
-          transform.SetScale({Math::Magnitude(currentRodSpan), 0.5f, 0.5f});
+          transform.SetScale(
+            {Math::Magnitude(currentRodSpan), rodWidths[1], rodWidths[1]});
         }
       },
     .mEnd =
@@ -593,7 +607,9 @@ Result Hull::AnimateQuickHull(const AnimationParams& params) {
             Vec3 rodCenter = (info.mValue.mEdgeCenter + rodEnd) / 2.0f;
             transform.SetTranslation(rodCenter);
             transform.SetScale(
-              {Math::Magnitude(info.mValue.mRodSpan), 0.5f, 0.5f});
+              {Math::Magnitude(info.mValue.mRodSpan),
+               rodWidths[1],
+               rodWidths[1]});
           }
         }
       },
@@ -601,7 +617,7 @@ Result Hull::AnimateQuickHull(const AnimationParams& params) {
   seq.Wait();
 
   seq.AddContinuousEvent({
-    .mName = "FadeAwayInitialAddedColors",
+    .mName = "BringInitialElementsOutOfFocus",
     .mDuration = 1.0f,
     .mEase = EaseType::Linear,
     .mLerp =
@@ -610,6 +626,17 @@ Result Hull::AnimateQuickHull(const AnimationParams& params) {
           .Get<Vec4>("uColor") = Lerp(smAddedRodColor, smRodColor, t);
         Rsl::GetRes<Gfx::Material>("QuickHull/asset:AddedVertexColor")
           .Get<Vec4>("uColor") = Lerp(smAddedVertexColor, smVertexColor, t);
+        float rodWidth = Lerp(rodWidths[1], rodWidths[0], t);
+        for (const auto& info: edgeRodInfos) {
+          info.mValue.mObject.Get<Comp::Transform>().SetScale(
+            {Math::Magnitude(info.mValue.mRodSpan), rodWidth, rodWidth});
+        }
+        const float sphereScale = Lerp(sphereScales[1], sphereScales[0], t);
+        for (const Vec3& pos: initialVertexPositions) {
+          vertexSpheres.Find(pos)
+            ->mValue.Get<Comp::Transform>()
+            .SetUniformScale(sphereScale);
+        }
       },
     .mEnd =
       [=](Sequence::Cross dir) {
@@ -638,7 +665,7 @@ Result Hull::AnimateQuickHull(const AnimationParams& params) {
   seq.Wait();
 
   seq.AddContinuousEvent({
-    .mName = "HighlightRemovedVertices",
+    .mName = "BringRemovedVerticesInFocus",
     .mDuration = 1.0f,
     .mEase = EaseType::Linear,
     .mBegin =
@@ -658,6 +685,12 @@ Result Hull::AnimateQuickHull(const AnimationParams& params) {
       [=](float t) {
         Rsl::GetRes<Gfx::Material>("QuickHull/asset:RemovedVertexColor")
           .Get<Vec4>("uColor") = Lerp(smVertexColor, smRemovedVertexColor, t);
+        const float sphereScale = Lerp(sphereScales[0], sphereScales[1], t);
+        for (const Vec3& removedPoint: removedPoints) {
+          vertexSpheres.Find(removedPoint)
+            ->mValue.Get<Comp::Transform>()
+            .SetUniformScale(sphereScale);
+        }
       },
   });
   seq.Wait();
@@ -668,10 +701,11 @@ Result Hull::AnimateQuickHull(const AnimationParams& params) {
     .mEase = EaseType::Linear,
     .mLerp =
       [=](float t) {
+        const float sphereScale = Lerp(sphereScales[1], 0.0f, t);
         for (const Vec3& removedPoint: removedPoints) {
-          auto& transform =
-            vertexSpheres.Find(removedPoint)->mValue.Get<Comp::Transform>();
-          transform.SetUniformScale((1.0f - t) * vertexSphereScale);
+          vertexSpheres.Find(removedPoint)
+            ->mValue.Get<Comp::Transform>()
+            .SetUniformScale(sphereScale);
         }
       },
     .mEnd =
@@ -851,7 +885,7 @@ Result Hull::AnimateQuickHull(const AnimationParams& params) {
     }
 
     seq.AddContinuousEvent({
-      .mName = "HighlightNewVertex",
+      .mName = "BringNewVertexIntoFocus",
       .mDuration = 1.0f,
       .mEase = EaseType::Linear,
       .mBegin =
@@ -869,6 +903,9 @@ Result Hull::AnimateQuickHull(const AnimationParams& params) {
         [=](float t) {
           Rsl::GetRes<Gfx::Material>("QuickHull/asset:AddedVertexColor")
             .Get<Vec4>("uColor") = Lerp(smVertexColor, smAddedVertexColor, t);
+          vertexSpheres.Find(newPoint)
+            ->mValue.Get<Comp::Transform>()
+            .SetUniformScale(Lerp(sphereScales[0], sphereScales[1], t));
         },
     });
     seq.Wait();
@@ -905,7 +942,8 @@ Result Hull::AnimateQuickHull(const AnimationParams& params) {
               Vec3 rodCenter = (info.mValue.mVertexPosition + rodEnd) / 2.0f;
               transform.SetTranslation(rodCenter);
               Vec3 currentRodSpan = rodEnd - info.mValue.mVertexPosition;
-              transform.SetScale({Math::Magnitude(currentRodSpan), 0.5f, 0.5f});
+              transform.SetScale(
+                {Math::Magnitude(currentRodSpan), rodWidths[1], rodWidths[1]});
             }
           }
         },
@@ -926,7 +964,9 @@ Result Hull::AnimateQuickHull(const AnimationParams& params) {
               Vec3 rodCenter = (info.mValue.mVertexPosition + rodEnd) / 2.0f;
               transform.SetTranslation(rodCenter);
               transform.SetScale(
-                {Math::Magnitude(info.mValue.mRodSpan), 0.5f, 0.5f});
+                {Math::Magnitude(info.mValue.mRodSpan),
+                 rodWidths[1],
+                 rodWidths[1]});
               mesh.mVisible = true;
             }
           }
@@ -935,7 +975,7 @@ Result Hull::AnimateQuickHull(const AnimationParams& params) {
     seq.Wait();
 
     seq.AddContinuousEvent({
-      .mName = "FadeAddedColors",
+      .mName = "BringAddedElementsOutOfFocus",
       .mDuration = 1.0f,
       .mEase = EaseType::Linear,
       .mLerp =
@@ -944,6 +984,14 @@ Result Hull::AnimateQuickHull(const AnimationParams& params) {
             .Get<Vec4>("uColor") = Lerp(smAddedRodColor, smRodColor, t);
           Rsl::GetRes<Gfx::Material>("QuickHull/asset:AddedVertexColor")
             .Get<Vec4>("uColor") = Lerp(smAddedVertexColor, smVertexColor, t);
+          vertexSpheres.Find(newPoint)
+            ->mValue.Get<Comp::Transform>()
+            .SetUniformScale(Lerp(sphereScales[1], sphereScales[0], t));
+          const float rodWidth = Lerp(rodWidths[1], rodWidths[0], t);
+          for (const auto& info: newEdgeRodInfos) {
+            info.mValue.mObject.Get<Comp::Transform>().SetScale(
+              {Math::Magnitude(info.mValue.mRodSpan), rodWidth, rodWidth});
+          }
         },
       .mEnd =
         [=](Sequence::Cross dir) {
@@ -1023,7 +1071,7 @@ Result Hull::AnimateQuickHull(const AnimationParams& params) {
 
     if (!removedRodInfos.Empty()) {
       seq.AddContinuousEvent({
-        .mName = "FadeRemoveColoredRodsToRemovedRodColor",
+        .mName = "BringRemovedRodsIntoFocus",
         .mDuration = 1.0f,
         .mEase = EaseType::Linear,
         .mBegin =
@@ -1042,6 +1090,11 @@ Result Hull::AnimateQuickHull(const AnimationParams& params) {
           [=](float t) {
             Rsl::GetRes<Gfx::Material>("QuickHull/asset:RemovedRodColor")
               .Get<Vec4>("uColor") = Lerp(smRodColor, smRemovedRodColor, t);
+            const float rodWidth = Lerp(rodWidths[0], rodWidths[1], t);
+            for (const auto& info: removedRodInfos) {
+              info.mObject.Get<Comp::Transform>().SetScale(
+                {Math::Magnitude(info.mRodSpan), rodWidth, rodWidth});
+            }
           },
       });
       seq.Wait();
@@ -1058,7 +1111,8 @@ Result Hull::AnimateQuickHull(const AnimationParams& params) {
               Vec3 rodCenter = (info.mVertexPosition + rodEnd) / 2.0f;
               transform.SetTranslation(rodCenter);
               Vec3 currentRodSpan = rodEnd - info.mVertexPosition;
-              transform.SetScale({Math::Magnitude(currentRodSpan), 0.5f, 0.5f});
+              transform.SetScale(
+                {Math::Magnitude(currentRodSpan), rodWidths[1], rodWidths[1]});
             }
           },
         .mEnd =
@@ -1241,7 +1295,9 @@ Result Hull::AnimateQuickHull(const AnimationParams& params) {
                   transform.SetTranslation(
                     edgeRodInfo.mEdgeCenter + edgeRodInfo.mRodSpan / 2.0f);
                   transform.SetScale(
-                    {Math::Magnitude(edgeRodInfo.mRodSpan), 0.5f, 0.5f});
+                    {Math::Magnitude(edgeRodInfo.mRodSpan),
+                     rodWidths[0],
+                     rodWidths[0]});
                 }
               }
               if (dir == Sequence::Cross::Out) {
@@ -1253,7 +1309,9 @@ Result Hull::AnimateQuickHull(const AnimationParams& params) {
                   transform.SetTranslation(
                     edgeRodInfo.mEdgeCenter + edgeRodInfo.mRodSpan / 2.0f);
                   transform.SetScale(
-                    {Math::Magnitude(edgeRodInfo.mRodSpan), 0.5f, 0.5f});
+                    {Math::Magnitude(edgeRodInfo.mRodSpan),
+                     rodWidths[0],
+                     rodWidths[0]});
                 }
               }
             },
@@ -1334,7 +1392,7 @@ Result Hull::AnimateQuickHull(const AnimationParams& params) {
 
     if (!mergedRodInfos.Empty()) {
       seq.AddContinuousEvent({
-        .mName = "FadeMergedColoredRodsToMergedRodColor",
+        .mName = "BringMergedRodsIntoFocus",
         .mDuration = 1.0f,
         .mEase = EaseType::Linear,
         .mBegin =
@@ -1353,6 +1411,11 @@ Result Hull::AnimateQuickHull(const AnimationParams& params) {
           [=](float t) {
             Rsl::GetRes<Gfx::Material>("QuickHull/asset:MergedRodColor")
               .Get<Vec4>("uColor") = Lerp(smRodColor, smMergedRodColor, t);
+            const float rodWidth = Lerp(rodWidths[0], rodWidths[1], t);
+            for (const auto& info: mergedRodInfos) {
+              info.mObject.Get<Comp::Transform>().SetScale(
+                {Math::Magnitude(info.mRodSpan), rodWidth, rodWidth});
+            }
           },
       });
       seq.Wait();
@@ -1369,7 +1432,8 @@ Result Hull::AnimateQuickHull(const AnimationParams& params) {
               Vec3 rodCenter = (info.mVertexPosition + rodEnd) / 2.0f;
               transform.SetTranslation(rodCenter);
               Vec3 currentRodSpan = rodEnd - info.mVertexPosition;
-              transform.SetScale({Math::Magnitude(currentRodSpan), 0.5f, 0.5f});
+              transform.SetScale(
+                {Math::Magnitude(currentRodSpan), rodWidths[1], rodWidths[1]});
             }
           },
         .mEnd =
@@ -1417,7 +1481,7 @@ Result Hull::AnimateQuickHull(const AnimationParams& params) {
 
     // Animation ///////////////////////////////////////////////////////////////
     seq.AddContinuousEvent({
-      .mName = "HighlightRemovedVertices",
+      .mName = "BringRemovedVerticesIntoFocus",
       .mDuration = 1.0f,
       .mEase = EaseType::Linear,
       .mBegin =
@@ -1437,6 +1501,12 @@ Result Hull::AnimateQuickHull(const AnimationParams& params) {
         [=](float t) {
           Rsl::GetRes<Gfx::Material>("QuickHull/asset:RemovedVertexColor")
             .Get<Vec4>("uColor") = Lerp(smVertexColor, smRemovedVertexColor, t);
+          const float sphereScale = Lerp(sphereScales[0], sphereScales[1], t);
+          for (const Vec3& removedPoint: removedPoints) {
+            vertexSpheres.Find(removedPoint)
+              ->mValue.Get<Comp::Transform>()
+              .SetUniformScale(sphereScale);
+          }
         },
     });
     seq.Wait();
@@ -1447,10 +1517,11 @@ Result Hull::AnimateQuickHull(const AnimationParams& params) {
       .mEase = EaseType::Linear,
       .mLerp =
         [=](float t) {
+          const float sphereScale = Lerp(sphereScales[1], 0.0f, t);
           for (const Vec3& removedPoint: removedPoints) {
-            auto& transform =
-              vertexSpheres.Find(removedPoint)->mValue.Get<Comp::Transform>();
-            transform.SetUniformScale((1.0f - t) * vertexSphereScale);
+            vertexSpheres.Find(removedPoint)
+              ->mValue.Get<Comp::Transform>()
+              .SetUniformScale(sphereScale);
           }
         },
       .mEnd =
@@ -1498,7 +1569,7 @@ Result Hull::AnimateQuickHull(const AnimationParams& params) {
   });
 
   seq.AddContinuousEvent({
-    .mName = "PulseBloomRemainingElements",
+    .mName = "PulseRemainingElements",
     .mDuration = 1.0f,
     .mEase = EaseType::Linear,
     .mBegin =
