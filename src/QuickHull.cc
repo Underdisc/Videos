@@ -46,6 +46,7 @@ struct Hull {
     Ds::Vector<Vec3> mPoints;
     Mat4 mTransform;
     float mCameraDistance;
+    float mTimeScale;
     Video* mVideo;
   };
   static Result AnimateQuickHull(const AnimationParams& params);
@@ -472,10 +473,11 @@ Result Hull::AnimateQuickHull(const AnimationParams& params) {
     initialVertexPositions.Push(vertIt->mPosition);
   }
 
+  const float defaultEventDuration = 0.5f * params.mTimeScale;
   seq.AddContinuousEvent({
     .mName = "BringInitialVerticesInFocus",
-    .mDuration = 1.0f,
-    .mEase = EaseType::Linear,
+    .mDuration = defaultEventDuration,
+    .mEase = EaseType::QuadIn,
     .mBegin =
       [=](Sequence::Cross dir) {
         for (const Vec3& pos: initialVertexPositions) {
@@ -555,8 +557,8 @@ Result Hull::AnimateQuickHull(const AnimationParams& params) {
 
   seq.AddContinuousEvent({
     .mName = "CreateInitialRods",
-    .mDuration = 1.0f,
-    .mEase = EaseType::Linear,
+    .mDuration = defaultEventDuration,
+    .mEase = EaseType::QuadIn,
     .mBegin =
       [=](Sequence::Cross dir) {
         for (const auto& info: initialSoleRods) {
@@ -618,8 +620,8 @@ Result Hull::AnimateQuickHull(const AnimationParams& params) {
 
   seq.AddContinuousEvent({
     .mName = "BringInitialElementsOutOfFocus",
-    .mDuration = 1.0f,
-    .mEase = EaseType::Linear,
+    .mDuration = defaultEventDuration,
+    .mEase = EaseType::QuadOut,
     .mLerp =
       [=](float t) {
         Rsl::GetRes<Gfx::Material>("QuickHull/asset:AddedRodColor")
@@ -666,8 +668,8 @@ Result Hull::AnimateQuickHull(const AnimationParams& params) {
 
   seq.AddContinuousEvent({
     .mName = "BringRemovedVerticesInFocus",
-    .mDuration = 1.0f,
-    .mEase = EaseType::Linear,
+    .mDuration = defaultEventDuration,
+    .mEase = EaseType::QuadIn,
     .mBegin =
       [=](Sequence::Cross dir) {
         for (const Vec3& removedPoint: removedPoints) {
@@ -697,8 +699,8 @@ Result Hull::AnimateQuickHull(const AnimationParams& params) {
 
   seq.AddContinuousEvent({
     .mName = "RemoveRemovedVertexSpheres",
-    .mDuration = 1.0f,
-    .mEase = EaseType::Linear,
+    .mDuration = defaultEventDuration,
+    .mEase = EaseType::QuadOut,
     .mLerp =
       [=](float t) {
         const float sphereScale = Lerp(sphereScales[1], 0.0f, t);
@@ -886,8 +888,8 @@ Result Hull::AnimateQuickHull(const AnimationParams& params) {
 
     seq.AddContinuousEvent({
       .mName = "BringNewVertexIntoFocus",
-      .mDuration = 1.0f,
-      .mEase = EaseType::Linear,
+      .mDuration = defaultEventDuration,
+      .mEase = EaseType::QuadIn,
       .mBegin =
         [=](Sequence::Cross dir) {
           World::Object vertexSphere = vertexSpheres.Find(newPoint)->mValue;
@@ -912,8 +914,8 @@ Result Hull::AnimateQuickHull(const AnimationParams& params) {
 
     seq.AddContinuousEvent({
       .mName = "CreateNewEdgeRods",
-      .mDuration = 1.0f,
-      .mEase = EaseType::Linear,
+      .mDuration = defaultEventDuration,
+      .mEase = EaseType::QuadIn,
       .mBegin =
         [=](Sequence::Cross dir) {
           for (const auto& info: newEdgeRodInfos) {
@@ -976,8 +978,8 @@ Result Hull::AnimateQuickHull(const AnimationParams& params) {
 
     seq.AddContinuousEvent({
       .mName = "BringAddedElementsOutOfFocus",
-      .mDuration = 1.0f,
-      .mEase = EaseType::Linear,
+      .mDuration = defaultEventDuration,
+      .mEase = EaseType::QuadIn,
       .mLerp =
         [=](float t) {
           Rsl::GetRes<Gfx::Material>("QuickHull/asset:AddedRodColor")
@@ -989,8 +991,8 @@ Result Hull::AnimateQuickHull(const AnimationParams& params) {
             .SetUniformScale(Lerp(sphereScales[1], sphereScales[0], t));
           const float rodWidth = Lerp(rodWidths[1], rodWidths[0], t);
           for (const auto& info: newEdgeRodInfos) {
-            info.mValue.mObject.Get<Comp::Transform>().SetScale(
-              {Math::Magnitude(info.mValue.mRodSpan), rodWidth, rodWidth});
+            auto& transform = info.mValue.mObject.Get<Comp::Transform>();
+            transform.SetScale({transform.GetScale()[0], rodWidth, rodWidth});
           }
         },
       .mEnd =
@@ -1072,8 +1074,8 @@ Result Hull::AnimateQuickHull(const AnimationParams& params) {
     if (!removedRodInfos.Empty()) {
       seq.AddContinuousEvent({
         .mName = "BringRemovedRodsIntoFocus",
-        .mDuration = 1.0f,
-        .mEase = EaseType::Linear,
+        .mDuration = defaultEventDuration,
+        .mEase = EaseType::QuadIn,
         .mBegin =
           [=](Sequence::Cross dir) {
             for (const auto& info: removedRodInfos) {
@@ -1097,42 +1099,6 @@ Result Hull::AnimateQuickHull(const AnimationParams& params) {
             }
           },
       });
-      seq.Wait();
-
-      seq.AddContinuousEvent({
-        .mName = "RemoveCoveredRods",
-        .mDuration = 1.0f,
-        .mEase = EaseType::Linear,
-        .mLerp =
-          [=](float t) {
-            for (const auto& info: removedRodInfos) {
-              auto& transform = info.mObject.Get<Comp::Transform>();
-              Vec3 rodEnd = info.mVertexPosition - (1.0f - t) * info.mRodSpan;
-              Vec3 rodCenter = (info.mVertexPosition + rodEnd) / 2.0f;
-              transform.SetTranslation(rodCenter);
-              Vec3 currentRodSpan = rodEnd - info.mVertexPosition;
-              transform.SetScale(
-                {Math::Magnitude(currentRodSpan), rodWidths[1], rodWidths[1]});
-            }
-          },
-        .mEnd =
-          [=](Sequence::Cross dir) {
-            for (const auto& info: removedRodInfos) {
-              auto& mesh = info.mObject.Get<Comp::Mesh>();
-              if (dir == Sequence::Cross::In) {
-                mesh.mVisible = true;
-                mesh.mMaterialId = "QuickHull/asset:RemovedRodColor";
-              }
-              else {
-                mesh.mVisible = false;
-                mesh.mMaterialId = "QuickHull/asset:RodColor";
-              }
-            }
-            Rsl::GetRes<Gfx::Material>("QuickHull/asset:RemovedRodColor")
-              .Get<Vec4>("uColor") = smRemovedRodColor;
-          },
-      });
-      seq.Wait();
     }
     // !Animation //////////////////////////////////////////////////////////////
 
@@ -1393,8 +1359,8 @@ Result Hull::AnimateQuickHull(const AnimationParams& params) {
     if (!mergedRodInfos.Empty()) {
       seq.AddContinuousEvent({
         .mName = "BringMergedRodsIntoFocus",
-        .mDuration = 1.0f,
-        .mEase = EaseType::Linear,
+        .mDuration = defaultEventDuration,
+        .mEase = EaseType::QuadIn,
         .mBegin =
           [=](Sequence::Cross dir) {
             for (const auto& info: mergedRodInfos) {
@@ -1418,12 +1384,103 @@ Result Hull::AnimateQuickHull(const AnimationParams& params) {
             }
           },
       });
-      seq.Wait();
+    }
+    // !Animation //////////////////////////////////////////////////////////////
 
+    for (const Ds::List<Vertex>::Iter& vertIt: mergedVerts) {
+      hull.mVertices.Erase(vertIt);
+    }
+    for (const Ds::List<HalfEdge>::Iter& edgeIt: mergedEdges) {
+      hull.mHalfEdges.Erase(edgeIt);
+    }
+
+    // Distribute orphaned conflict points to the new conflict lists. We ignore
+    // any conflict lists that have no conflict points.
+    for (const Vec3& point: conflictPoints) {
+      if (!assignConflictPoint(point, newFaceConflictLists)) {
+        removedPoints.Push(point);
+      }
+    }
+    for (auto& newFaceConflictListIt: newFaceConflictLists) {
+      ConflictList& newFaceConflistList = newFaceConflictListIt.mValue;
+      if (newFaceConflistList.mPoints.Size() > 0) {
+        faceConflictLists.Insert(
+          newFaceConflictListIt.Key(), std::move(newFaceConflistList));
+      }
+    }
+
+    // Animation ///////////////////////////////////////////////////////////////
+    seq.AddContinuousEvent({
+      .mName = "BringRemovedVerticesIntoFocus",
+      .mDuration = defaultEventDuration,
+      .mEase = EaseType::QuadIn,
+      .mBegin =
+        [=](Sequence::Cross dir) {
+          for (const Vec3& removedPoint: removedPoints) {
+            auto& mesh =
+              vertexSpheres.Find(removedPoint)->mValue.Get<Comp::Mesh>();
+            if (dir == Sequence::Cross::In) {
+              mesh.mMaterialId = "QuickHull/asset:RemovedVertexColor";
+            }
+            else {
+              mesh.mMaterialId = "QuickHull/asset:VertexColor";
+            }
+          }
+        },
+      .mLerp =
+        [=](float t) {
+          Rsl::GetRes<Gfx::Material>("QuickHull/asset:RemovedVertexColor")
+            .Get<Vec4>("uColor") = Lerp(smVertexColor, smRemovedVertexColor, t);
+          const float sphereScale = Lerp(sphereScales[0], sphereScales[1], t);
+          for (const Vec3& removedPoint: removedPoints) {
+            vertexSpheres.Find(removedPoint)
+              ->mValue.Get<Comp::Transform>()
+              .SetUniformScale(sphereScale);
+          }
+        },
+    });
+    seq.Wait();
+
+    if (!removedRodInfos.Empty()) {
+      seq.AddContinuousEvent({
+        .mName = "RemoveCoveredRods",
+        .mDuration = defaultEventDuration,
+        .mEase = EaseType::QuadOut,
+        .mLerp =
+          [=](float t) {
+            for (const auto& info: removedRodInfos) {
+              auto& transform = info.mObject.Get<Comp::Transform>();
+              Vec3 rodEnd = info.mVertexPosition - (1.0f - t) * info.mRodSpan;
+              Vec3 rodCenter = (info.mVertexPosition + rodEnd) / 2.0f;
+              transform.SetTranslation(rodCenter);
+              Vec3 currentRodSpan = rodEnd - info.mVertexPosition;
+              transform.SetScale(
+                {Math::Magnitude(currentRodSpan), rodWidths[1], rodWidths[1]});
+            }
+          },
+        .mEnd =
+          [=](Sequence::Cross dir) {
+            for (const auto& info: removedRodInfos) {
+              auto& mesh = info.mObject.Get<Comp::Mesh>();
+              if (dir == Sequence::Cross::In) {
+                mesh.mVisible = true;
+                mesh.mMaterialId = "QuickHull/asset:RemovedRodColor";
+              }
+              else {
+                mesh.mVisible = false;
+                mesh.mMaterialId = "QuickHull/asset:RodColor";
+              }
+            }
+            Rsl::GetRes<Gfx::Material>("QuickHull/asset:RemovedRodColor")
+              .Get<Vec4>("uColor") = smRemovedRodColor;
+          },
+      });
+    }
+    if (!mergedRodInfos.Empty()) {
       seq.AddContinuousEvent({
         .mName = "RemoveMergedRods",
-        .mDuration = 1.0f,
-        .mEase = EaseType::Linear,
+        .mDuration = defaultEventDuration,
+        .mEase = EaseType::QuadOut,
         .mLerp =
           [=](float t) {
             for (const auto& info: mergedRodInfos) {
@@ -1453,68 +1510,11 @@ Result Hull::AnimateQuickHull(const AnimationParams& params) {
               .Get<Vec4>("uColor") = smMergedRodColor;
           },
       });
-      seq.Wait();
     }
-    // !Animation //////////////////////////////////////////////////////////////
-
-    for (const Ds::List<Vertex>::Iter& vertIt: mergedVerts) {
-      hull.mVertices.Erase(vertIt);
-    }
-    for (const Ds::List<HalfEdge>::Iter& edgeIt: mergedEdges) {
-      hull.mHalfEdges.Erase(edgeIt);
-    }
-
-    // Distribute orphaned conflict points to the new conflict lists. We ignore
-    // any conflict lists that have no conflict points.
-    for (const Vec3& point: conflictPoints) {
-      if (!assignConflictPoint(point, newFaceConflictLists)) {
-        removedPoints.Push(point);
-      }
-    }
-    for (auto& newFaceConflictListIt: newFaceConflictLists) {
-      ConflictList& newFaceConflistList = newFaceConflictListIt.mValue;
-      if (newFaceConflistList.mPoints.Size() > 0) {
-        faceConflictLists.Insert(
-          newFaceConflictListIt.Key(), std::move(newFaceConflistList));
-      }
-    }
-
-    // Animation ///////////////////////////////////////////////////////////////
-    seq.AddContinuousEvent({
-      .mName = "BringRemovedVerticesIntoFocus",
-      .mDuration = 1.0f,
-      .mEase = EaseType::Linear,
-      .mBegin =
-        [=](Sequence::Cross dir) {
-          for (const Vec3& removedPoint: removedPoints) {
-            auto& mesh =
-              vertexSpheres.Find(removedPoint)->mValue.Get<Comp::Mesh>();
-            if (dir == Sequence::Cross::In) {
-              mesh.mMaterialId = "QuickHull/asset:RemovedVertexColor";
-            }
-            else {
-              mesh.mMaterialId = "QuickHull/asset:VertexColor";
-            }
-          }
-        },
-      .mLerp =
-        [=](float t) {
-          Rsl::GetRes<Gfx::Material>("QuickHull/asset:RemovedVertexColor")
-            .Get<Vec4>("uColor") = Lerp(smVertexColor, smRemovedVertexColor, t);
-          const float sphereScale = Lerp(sphereScales[0], sphereScales[1], t);
-          for (const Vec3& removedPoint: removedPoints) {
-            vertexSpheres.Find(removedPoint)
-              ->mValue.Get<Comp::Transform>()
-              .SetUniformScale(sphereScale);
-          }
-        },
-    });
-    seq.Wait();
-
     seq.AddContinuousEvent({
       .mName = "RemoveRemovedVertexSpheres",
-      .mDuration = 1.0f,
-      .mEase = EaseType::Linear,
+      .mDuration = defaultEventDuration,
+      .mEase = EaseType::QuadOut,
       .mLerp =
         [=](float t) {
           const float sphereScale = Lerp(sphereScales[1], 0.0f, t);
@@ -1570,8 +1570,8 @@ Result Hull::AnimateQuickHull(const AnimationParams& params) {
 
   seq.AddContinuousEvent({
     .mName = "PulseRemainingElements",
-    .mDuration = 1.0f,
-    .mEase = EaseType::Linear,
+    .mDuration = 0.35f,
+    .mEase = EaseType::QuadIn,
     .mBegin =
       [=](Sequence::Cross dir) {
         for (const auto& edgeRodInfo: edgeRodInfos) {
@@ -1594,8 +1594,8 @@ Result Hull::AnimateQuickHull(const AnimationParams& params) {
 
   seq.AddContinuousEvent({
     .mName = "VanishRemainingElements",
-    .mDuration = 1.0f,
-    .mEase = EaseType::Linear,
+    .mDuration = 2.5f,
+    .mEase = EaseType::QuadOut,
     .mLerp =
       [=](float t) {
         Rsl::GetRes<Gfx::Material>("QuickHull/asset:PulseColor")
@@ -1638,6 +1638,8 @@ Result Hull::AnimateQuickHull(const AnimationParams& params) {
           {0, 0, 0}, {0, 1, 0}, cameraObject);
       },
   });
+
+  seq.Gap(0.25f);
   // !Animation ////////////////////////////////////////////////////////////////
 
   return Result();
@@ -1676,6 +1678,7 @@ Result QuickHullAnimation(Video* video) {
   }
   Math::Scale(&params.mTransform, 2.0f);
   params.mCameraDistance = 5.0f;
+  params.mTimeScale = 0.9f;
   allParams.Emplace(std::move(params));
 
   // Cylinder
@@ -1689,6 +1692,7 @@ Result QuickHullAnimation(Video* video) {
   Math::Rotate(&rotate, Quat::AngleAxis(Math::nPi * (2.0f / 4.0f), {0, 0, 1}));
   params.mTransform = rotate * scale;
   params.mCameraDistance = 3.8f;
+  params.mTimeScale = 0.33f;
   allParams.Emplace(std::move(params));
 
   auto fetchMeshPoints = [&params](const char* meshFile) {
@@ -1705,6 +1709,7 @@ Result QuickHullAnimation(Video* video) {
   Math::Translate(&translate, {-1.0f, -0.2f, 0});
   params.mTransform = translate * rotate * scale;
   params.mCameraDistance = 6.0f;
+  params.mTimeScale = 0.13f;
   allParams.Emplace(std::move(params));
 
   fetchMeshPoints("QuickHull/suzanne.obj");
@@ -1712,6 +1717,7 @@ Result QuickHullAnimation(Video* video) {
   Math::Translate(&translate, {0, -0.5f, 0});
   params.mTransform = translate * scale;
   params.mCameraDistance = 8.0f;
+  params.mTimeScale = 0.07f;
   allParams.Emplace(std::move(params));
 
   // Create the animation events for all of the point clouds.
