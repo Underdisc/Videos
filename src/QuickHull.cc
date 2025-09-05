@@ -1,4 +1,5 @@
 #include <functional>
+#include <random>
 
 #include <comp/Camera.h>
 #include <comp/Mesh.h>
@@ -1658,9 +1659,28 @@ Result QuickHullAnimation(Video* video) {
   video->mLayerIt->mCameraId = camera.mMemberId;
 
   // Collect the point clouds that we'll animate quick hull on.
-  // Cube
   Ds::Vector<Hull::AnimationParams> allParams;
   Hull::AnimationParams params = {.mVideo = video};
+
+  // Random
+  auto acquireRandomPoint = [&]() -> Vec3 {};
+  std::mt19937 generator;
+  std::uniform_int_distribution<uint64_t> distribution(0);
+  for (int i = 0; i < 15; ++i) {
+    Vec3 point;
+    const uint64_t cutoff = 50;
+    for (int i = 0; i < 3; ++i) {
+      point[i] = (float)(distribution(generator) % cutoff) / (float)cutoff;
+      point[i] = point[i] * 2.0f - 1.0f;
+    }
+    params.mPoints.Push(point);
+  }
+  Math::Scale(&params.mTransform, 1.8f);
+  params.mCameraDistance = 3.5f;
+  params.mTimeScale = 0.75f;
+  allParams.Emplace(std::move(params));
+
+  // Cube
   float heights[4] = {-1, -0.5f, 0.5f, 1};
   for (int i = 0; i < 4; ++i) {
     params.mPoints.Push({1, heights[i], -1});
@@ -1678,7 +1698,7 @@ Result QuickHullAnimation(Video* video) {
   }
   Math::Scale(&params.mTransform, 2.0f);
   params.mCameraDistance = 5.0f;
-  params.mTimeScale = 0.9f;
+  params.mTimeScale = 0.7f;
   allParams.Emplace(std::move(params));
 
   // Cylinder
@@ -1692,7 +1712,22 @@ Result QuickHullAnimation(Video* video) {
   Math::Rotate(&rotate, Quat::AngleAxis(Math::nPi * (2.0f / 4.0f), {0, 0, 1}));
   params.mTransform = rotate * scale;
   params.mCameraDistance = 3.8f;
-  params.mTimeScale = 0.33f;
+  params.mTimeScale = 0.45f;
+  allParams.Emplace(std::move(params));
+
+  // Arrow
+  params.mPoints.Push({0, 3.0f, 0});
+  for (int i = 0; i < 12; ++i) {
+    float theta = Math::nTau * (float)i / 12.0f;
+    float sin = std::sinf(theta);
+    float cos = std::cosf(theta);
+    params.mPoints.Push({2.0f * sin, 0.7f, 2.0f * cos});
+    params.mPoints.Push({sin, 0.7f, cos});
+    params.mPoints.Push({sin, -2, cos});
+  }
+  Math::Scale(&params.mTransform, 1.0f);
+  params.mCameraDistance = 3.2f;
+  params.mTimeScale = 0.35f;
   allParams.Emplace(std::move(params));
 
   auto fetchMeshPoints = [&params](const char* meshFile) {
