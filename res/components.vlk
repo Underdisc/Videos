@@ -9,26 +9,92 @@
     },
     {
       :Id: '1'
-      :Name: 'Model'
-      :Size: '8'
+      :Name: 'Mesh'
+      :Size: '65'
       :Dependencies: ['Transform']
     },
     {
       :Id: '2'
       :Name: 'Sprite'
-      :Size: '8'
+      :Size: '64'
       :Dependencies: ['Transform']
     },
     {
       :Id: '3'
       :Name: 'Text'
-      :Size: '68'
+      :Size: '125'
       :Dependencies: ['Transform']
     },
     {
       :Id: '4'
       :Name: 'AlphaColor'
       :Size: '16'
+      :Dependencies: []
+    },
+    {
+      :Id: '5'
+      :Name: 'Camera'
+      :Size: '16'
+      :Dependencies: ['Transform']
+    },
+    {
+      :Id: '6'
+      :Name: 'DirectionalLight'
+      :Size: '48'
+      :Dependencies: ['Transform']
+    },
+    {
+      :Id: '7'
+      :Name: 'PointLight'
+      :Size: '60'
+      :Dependencies: ['Transform']
+    },
+    {
+      :Id: '8'
+      :Name: 'SpotLight'
+      :Size: '68'
+      :Dependencies: ['Transform']
+    },
+    {
+      :Id: '9'
+      :Name: 'Skybox'
+      :Size: '32'
+      :Dependencies: ['Transform']
+    },
+    {
+      :Id: '10'
+      :Name: 'ShadowMap'
+      :Size: '20'
+      :Dependencies: ['Camera']
+    },
+    {
+      :Id: '11'
+      :Name: 'Model'
+      :Size: '40'
+      :Dependencies: ['Transform']
+    },
+    {
+      :Id: '12'
+      :Name: 'CameraOrbiter'
+      :Size: '24'
+      :Dependencies: ['Camera']
+    },
+    {
+      :Id: '13'
+      :Name: 'BoxCollider'
+      :Size: '44'
+      :Dependencies: []
+    },
+    {
+      :Id: '14'
+      :Name: 'Name'
+      :Size: '32'
+      :Dependencies: []
+    },
+    {
+      :Id: '15'
+      :Name: 'Relationship'
+      :Size: '28'
       :Dependencies: []
     }
   ]
