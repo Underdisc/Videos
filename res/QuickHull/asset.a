@@ -7,5 +7,23 @@
       :FlipUvs: '0'
       :Scale: '1'
     }
+  },
+  {
+    :Name: 'Tonemap'
+    :Type: 'Material'
+    :Config: {
+      :ShaderConfig: {
+        :Files: ['vres/shader/FullscreenTexture.glv', 'QuickHull/Tonemap.glf']
+      }
+    }
+  },
+  {
+    :Name: 'IntenseExtract'
+    :Type: 'Material'
+    :Config: {
+      :ShaderConfig: {
+        :Files: ['vres/shader/FullscreenTexture.glv', 'QuickHull/IntenseExtract.glf']
+      }
+    }
   }
 ]

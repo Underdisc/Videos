@@ -8,6 +8,7 @@
 #include <ds/List.h>
 #include <gfx/Material.h>
 #include <gfx/Mesh.h>
+#include <gfx/Renderer.h>
 #include <math/Constants.h>
 #include <math/Matrix4.h>
 #include <math/Plane.h>
@@ -65,14 +66,14 @@ struct Hull {
 };
 
 const Vec4 Hull::smVertexColor = {1, 1, 1, 1};
-const Vec4 Hull::smAddedVertexColor = {2, 9, 2, 1};
-const Vec4 Hull::smRemovedVertexColor = {9, 2, 2, 1};
+const Vec4 Hull::smAddedVertexColor = {0.3f, 7.0f, 0.3f, 1};
+const Vec4 Hull::smRemovedVertexColor = {7.0f, 0.3f, 0.3f, 1};
 const Vec4 Hull::smRodColor = {1, 1, 1, 1};
-const Vec4 Hull::smAddedRodColor = {2, 9, 2, 1};
-const Vec4 Hull::smRemovedRodColor = {9, 2, 2, 1};
-const Vec4 Hull::smMergedRodColor = {2, 9, 9, 1};
-const Vec4 Hull::smPulseColor = {5, 5, 5, 1};
-const Vec4 Hull::smVanishColor = {1, 1, 1, 0};
+const Vec4 Hull::smAddedRodColor = {0.3f, 7.0f, 0.3f, 1};
+const Vec4 Hull::smRemovedRodColor = {7.0f, 0.3f, 0.3f, 1};
+const Vec4 Hull::smMergedRodColor = {0.3f, 7.0f, 7.0f, 1};
+const Vec4 Hull::smPulseColor = {7, 7, 7, 1};
+const Vec4 Hull::smVanishColor = {0, 0, 0, 0};
 
 void Hull::CreateResources() {
   static Rsl::Asset& asset = Rsl::RequireAsset("QuickHull/asset");
@@ -425,7 +426,7 @@ Result Hull::AnimateQuickHull(const AnimationParams& params) {
   seq.AddContinuousEvent({
     .mName = "BringPotentialVerticesOutOfFocus",
     .mDuration = 2.0f,
-    .mEase = EaseType::FlattenedCubic,
+    .mEase = EaseType::QuadOut,
     .mLerp =
       [=](float t) {
         const float sphereScale = Lerp(sphereScales[1], sphereScales[0], t);
@@ -1657,6 +1658,9 @@ Result QuickHullAnimation(Video* video) {
   cameraTransform.SetTranslation({0.0f, 0.0f, 10.0f});
   cameraComp.WorldLookAt({0.0f, 0.0f, 0.0f}, {0.0f, 1.0f, 0.0f}, camera);
   video->mLayerIt->mCameraId = camera.mMemberId;
+  video->mLayerIt->mIntenseExtractMaterialId = "QuickHull/asset:IntenseExtract";
+  video->mLayerIt->mTonemapMaterialId = "QuickHull/asset:Tonemap";
+  Gfx::Renderer::nClearColor = {0, 0, 0, 0};
 
   // Collect the point clouds that we'll animate quick hull on.
   Ds::Vector<Hull::AnimationParams> allParams;
@@ -1677,7 +1681,7 @@ Result QuickHullAnimation(Video* video) {
   }
   Math::Scale(&params.mTransform, 1.8f);
   params.mCameraDistance = 3.5f;
-  params.mTimeScale = 0.75f;
+  params.mTimeScale = 0.7f;
   allParams.Emplace(std::move(params));
 
   // Cube
